@@ -1,4 +1,4 @@
-package xhash
+package xsystem
 
 import (
 	"github.com/jurgen-kluft/xbase/package"
@@ -7,25 +7,25 @@ import (
 	"github.com/jurgen-kluft/xunittest/package"
 )
 
-// GetPackage returns the package object of 'xhash'
+// GetPackage returns the package object of 'xsystem'
 func GetPackage() *denv.Package {
 	// Dependencies
 	xunittestpkg := xunittest.GetPackage()
 	xentrypkg := xentry.GetPackage()
 	xbasepkg := xbase.GetPackage()
 
-	// The main (xhash) package
-	mainpkg := denv.NewPackage("xhash")
+	// The main (xsystem) package
+	mainpkg := denv.NewPackage("xsystem")
 	mainpkg.AddPackage(xunittestpkg)
 	mainpkg.AddPackage(xentrypkg)
 	mainpkg.AddPackage(xbasepkg)
 
-	// 'xhash' library
-	mainlib := denv.SetupDefaultCppLibProject("xhash", "github.com\\jurgen-kluft\\xhash")
+	// 'xsystem' library
+	mainlib := denv.SetupDefaultCppLibProject("xsystem", "github.com\\jurgen-kluft\\xsystem")
 	mainlib.Dependencies = append(mainlib.Dependencies, xbasepkg.GetMainLib())
 
-	// 'xhash' unittest project
-	maintest := denv.SetupDefaultCppTestProject("xhash_test", "github.com\\jurgen-kluft\\xhash")
+	// 'xsystem' unittest project
+	maintest := denv.SetupDefaultCppTestProject("xsystem_test", "github.com\\jurgen-kluft\\xsystem")
 	maintest.Dependencies = append(maintest.Dependencies, xunittestpkg.GetMainLib())
 	maintest.Dependencies = append(maintest.Dependencies, xentrypkg.GetMainLib())
 	maintest.Dependencies = append(maintest.Dependencies, xbasepkg.GetMainLib())
