@@ -6,16 +6,16 @@
 #pragma once
 #endif
 
-#include "xbase/x_types.h"
-
 //==============================================================================
 // xCore namespace
 //==============================================================================
 namespace xcore
 {
+	class x_iallocator;
+
 	namespace xsystem
 	{
-
+		struct xctxt;
 
 		enum ELanguage
 		{
@@ -51,6 +51,7 @@ namespace xcore
 
 		enum EConsoleType
 		{
+			CONSOLE_DESKTOP,
 			CONSOLE_DEVKIT,
 			CONSOLE_TESTKIT,
 			CONSOLE_RETAIL,
@@ -58,55 +59,81 @@ namespace xcore
 
 		enum EMediaType
 		{
-			MEDIA_HOST,
-			MEDIA_DISC,
-			MEDIA_MS,
-			MEDIA_HDD,
+			MEDIA_LOCAL   = 0x01,
+			MEDIA_NETWORK = 0x02,
+			MEDIA_CD = 0x04,
+			MEDIA_DVD = 0x08,
+			MEDIA_BLURAY = 0x10,
+			MEDIA_SD = 0x20, 
+			MEDIA_HDD = 0x40,
+			MEDIA_SSD = 0x80
 		};
 
-		struct nodeid_t
+		enum EDataSource
+		{
+			DATA_FROM_HOST = 0x00,
+			DATA_FROM_DVD = 0x10,
+			DATA_FROM_NETWORK = 0x20,
+			DATA_FROM_HARDDISK = 0x40,
+			DATA_FROM_SSD = 0x80,
+			DATA_FROM_MASK = 0xFF,
+		};
+
+		enum EEnvMode
+		{
+			ENVIRONMENT_OPEN = 0,
+			ENVIRONMENT_DEBUG = 1,
+			ENVIRONMENT_DEVELOPMENT = 2,
+			ENVIRONMENT_QA = 3,
+			ENVIRONMENT_RETAIL = 4,
+		};
+
+		struct MAC_t
 		{
 			xbyte	mID[6];
 		};
 
-		void					init					( );
-		void 					update					( );
-		void					shutdown				( );
+		void					init					(x_iallocator*, xctxt*& );
+		void 					update					(xctxt* );
+		void					shutdown				(xctxt* );
 
-		void					printPlatformName		( );
-		void					printConsoleType		( );
-		void					printMediaType			( );
-		void					printCurrentLanguage	( );
-		void					printExecutableInfo		( );
-		void					printCpuInfo			( );
-		void					printMemoryInfo			( );
+		void					printCpuInfo			(xctxt* );
+		void					printMemoryInfo			(xctxt* );
 
-		EConsoleType			getConsoleType			( );
-		EMediaType				getMediaType			( );
-		nodeid_t				getNodeId				( );
+		EConsoleType			getConsoleType			(xctxt*);
+		EMediaType				getMediaType			(xctxt*);
+		EDataSource				getDataSource			(xctxt*);
+		EEnvMode				getEnvMode				(xctxt*);
 
-		ELanguage				getLanguage				( );
-		const char*				getLanguageStr			( );
-		void					setLanguage				( ELanguage language );
+		MAC_t					getMAC					(xctxt*);
 
-		void					getNickname				( char* szBuffer, u32 szBufferMaxLen );
-		bool					isCircleButtonBack		( );
+		ELanguage				getLanguage				(xctxt*);
+		void					setLanguage				(xctxt*, ELanguage language );
 
-		void					setGameTitle			( const char* title );
-		const char*				getGameTitle			( );
-		const char*				getExePath				( );
+		void					getNickname				(xctxt*, char* szBuffer, u32 szBufferMaxLen );
+		bool					isCircleButtonBack		(xctxt*);
 
-		s32						getNumCores				( );
-		s32						getNumHwThreadsPerCore	( );
-		u64						getCoreClockFrequency	( );
+		void					setAppTitle				(xctxt*, const char* title );
+		const char*				getAppTitle				(xctxt* );
+		const char*				getExePath				(xctxt* );
 
-		const char*				getPlatformStr			( );		///< Name of platform
-		const char*				getBuildConfigStr		( );		///< Debug, Release, Final
-		const char*				getBuildModeStr			( );		///< Dev, Client, Retail
-		s32						getCodeSegmentSize		( );
-		s32						getBssSegmentSize		( );
-		s32						getDataSegmentSize		( );
-		s32						getMainThreadStackSize	( );
+		bool					hasVirtualMemory		(xctxt* );
+
+		s32						getNumCores				(xctxt*);
+		s32						getNumHwThreadsPerCore	(xctxt*);
+		u64						getCoreClockFrequency	(xctxt*);
+
+		const char*				getPlatformName			(xctxt*);		// Name of platform
+		const char*				getBuildConfigName		(xctxt*);		// Debug, Release, Final
+		const char*				getBuildModeName		(xctxt*);		// Dev, Client, Retail
+		const char*				getConsoleTypeName		(xctxt*);		// 
+		const char*				getMediaTypeName		(xctxt*);		// 
+		const char*				getLanguageName			(xctxt*);
+
+		u64						getCodeSegmentSize		(xctxt*);
+		u64						getBssSegmentSize		(xctxt*);
+		u64						getDataSegmentSize		(xctxt*);
+		u64						getMainThreadStackSize	(xctxt*);
 	};
 
 	//==============================================================================
@@ -121,13 +148,13 @@ namespace xcore
 //==============================================================================
 // Win32
 //==============================================================================
-#if defined TARGET_PC && defined X_TARGET_32BIT
+#if defined TARGET_PC && defined PLATFORM_32BIT
 	#include "xsystem/private/x_system_win32.h"
 
 //==============================================================================
 // Win64
 //==============================================================================
-#elif defined TARGET_PC && defined X_TARGET_64BIT
+#elif defined TARGET_PC && defined PLATFORM_64BIT
 	#include "xsystem/private/x_system_win64.h"
 
 //==============================================================================

@@ -1,4 +1,4 @@
-#include "xbase/x_target.h"
+ï»¿#include "xbase/x_target.h"
 
 #ifdef TARGET_PC
 
@@ -20,6 +20,11 @@
 #include <tchar.h>
 #include <Assert.h>
 #include <Dbghelp.h>
+#include <intrin.h> 
+#include <array>
+#include <vector>
+#include <string>
+#include <thread>
 
 #include "xbase/x_debug.h"
 #include "xbase/x_string_ascii.h"
@@ -35,1568 +40,563 @@ namespace xcore
 {
 	namespace xcpu_info_win32
 	{
-		#define CPU_INFO_TRY				
-		#define CPU_INFO_CATCH_ALL			if (false)
+		struct cache_descr
+		{
+			u8				mId;
+			const char*		mDescr;
+		};
 
-		#define CHIPNAME_STRING_LENGTH		(48 + 1)
-		#define VENDOR_STRING_LENGTH		(12 + 1)
-		#define SERIALNUMBER_STRING_LENGTH	(29 + 1)
+		cache_descr CacheLookup[] =
+		{
+			{ 0x1, "Instruction TLB: 4 KByte pages, 4-way set associative, 32 entries" },
+			{ 0x2, "Instruction TLB: 4 MByte pages, fully associative, 2 entries" },
+			{ 0x3, "Data TLB: 4 KByte pages, 4-way set associative, 64 entries" },
+			{ 0x4, "Data TLB: 4 MByte pages, 4-way set associative, 8 entries" },
+			{ 0x5, "Data TLB1: 4 MByte pages, 4-way set associative, 32 entries" },
+			{ 0x6, "1st-level instruction cache: 8 KBytes, 4-way set associative, 32 byte line size" },
+			{ 0x8, "1st-level instruction cache: 16 KBytes, 4-way set associative, 32 byte line size" },
+			{ 0x9, "1st-level instruction cache: 32KBytes, 4-way set associative, 64 byte line size" },
+			{ 0xA, "1st-level data cache: 8 KBytes, 2-way set associative, 32 byte line size" },
+			{ 0xB, "Instruction TLB: 4 MByte pages, 4-way set associative, 4 entries" },
+			{ 0xC, "1st-level data cache: 16 KBytes, 4-way set associative, 32 byte line size" },
+			{ 0xD, "1st-level data cache: 16 KBytes, 4-way set associative, 64 byte line size" },
+			{ 0xE, "1st-level data cache: 24 KBytes, 6-way set associative, 64 byte line size" },
+			{ 0x1D, "2nd-level cache: 128 KBytes, 2-way set associative, 64 byte line size" },
+			{ 0x21, "2nd-level cache: 256 KBytes, 8-way set associative, 64 byte line size" },
+			{ 0x22, "3rd-level cache: 512 KBytes, 4-way set associative, 64 byte line size, 2 lines per sector" },
+			{ 0x23, "3rd-level cache: 1 MBytes, 8-way set associative, 64 byte line size, 2 lines per sector" },
+			{ 0x24, "2nd-level cache: 1 MBytes, 16-way set associative, 64 byte line size" },
+			{ 0x25, "3rd-level cache: 2 MBytes, 8-way set associative, 64 byte line size, 2 lines per sector" },
+			{ 0x29, "3rd-level cache: 4 MBytes, 8-way set associative, 64 byte line size, 2 lines per sector" },
+			{ 0x2C, "1st-level data cache: 32 KBytes, 8-way set associative, 64 byte line size" },
+			{ 0x30, "1st-level instruction cache: 32 KBytes, 8-way set associative, 64 byte line size" },
+			{ 0x40, "No 2nd-level cache or, if processor contains a valid 2nd-level cache, no 3rd-level cache" },
+			{ 0x41, "2nd-level cache: 128 KBytes, 4-way set associative, 32 byte line size" },
+			{ 0x42, "2nd-level cache: 256 KBytes, 4-way set associative, 32 byte line size" },
+			{ 0x43, "2nd-level cache: 512 KBytes, 4-way set associative, 32 byte line size" },
+			{ 0x44, "2nd-level cache: 1 MByte, 4-way set associative, 32 byte line size" },
+			{ 0x45, "2nd-level cache: 2 MByte, 4-way set associative, 32 byte line size" },
+			{ 0x46, "3rd-level cache: 4 MByte, 4-way set associative, 64 byte line size" },
+			{ 0x47, "3rd-level cache: 8 MByte, 8-way set associative, 64 byte line size" },
+			{ 0x48, "2nd-level cache: 3MByte, 12-way set associative, 64 byte line size" },
+			{ 0x49, "3rd-level cache: 4MB, 16-way set associative, 64-byte line size (Intel Xeon processor MP, Family 0FH, Model06H); 2nd - level cache : 4 MByte, 16 - way set associative, 64 byte line size" },
+			{ 0x4A, "3rd-level cache: 6MByte, 12-way set associative, 64 byte line size" },
+			{ 0x4B, "3rd-level cache: 8MByte, 16-way set associative, 64 byte line size" },
+			{ 0x4C, "3rd-level cache: 12MByte, 12-way set associative, 64 byte line size" },
+			{ 0x4D, "3rd-level cache: 16MByte, 16-way set associative, 64 byte line size" },
+			{ 0x4E, "2nd-level cache: 6MByte, 24-way set associative, 64 byte line size" },
+			{ 0x4F, "Instruction TLB: 4 KByte pages, 32 entries" },
+			{ 0x50, "Instruction TLB: 4 KByte and 2-MByte or 4-MByte pages, 64 entries" },
+			{ 0x51, "Instruction TLB: 4 KByte and 2-MByte or 4-MByte pages, 128 entries" },
+			{ 0x52, "Instruction TLB: 4 KByte and 2-MByte or 4-MByte pages, 256 entries" },
+			{ 0x55, "Instruction TLB: 2-MByte or 4-MByte pages, fully associative, 7 entries" },
+			{ 0x56, "Data TLB0: 4 MByte pages, 4-way set associative, 16 entries" },
+			{ 0x57, "Data TLB0: 4 KByte pages, 4-way associative, 16 entries" },
+			{ 0x59, "Data TLB0: 4 KByte pages, fully associative, 16 entries" },
+			{ 0x5A, "Data TLB0: 2 MByte or 4 MByte pages, 4-way set associative, 32 entries" },
+			{ 0x5B, "Data TLB: 4 KByte and 4 MByte pages, 64 entries" },
+			{ 0x5C, "Data TLB: 4 KByte and 4 MByte pages,128 entries" },
+			{ 0x5D, "Data TLB: 4 KByte and 4 MByte pages,256 entries" },
+			{ 0x60, "1st-level data cache: 16 KByte, 8-way set associative, 64 byte line size" },
+			{ 0x61, "Instruction TLB: 4 KByte pages, fully associative, 48 entries" },
+			{ 0x63, "Data TLB: 2 MByte or 4 MByte pages, 4-way set associative, 32 entries and a separate array with 1 GBytepages, 4 - way set associative, 4 entries" },
+			{ 0x64, "Data TLB: 4 KByte pages, 4-way set associative, 512 entries" },
+			{ 0x66, "1st-level data cache: 8 KByte, 4-way set associative, 64 byte line size" },
+			{ 0x67, "1st-level data cache: 16 KByte, 4-way set associative, 64 byte line size" },
+			{ 0x68, "1st-level data cache: 32 KByte, 4-way set associative, 64 byte line size" },
+			{ 0x6A, "uTLB: 4 KByte pages, 8-way set associative, 64 entries" },
+			{ 0x6B, "DTLB: 4 KByte pages, 8-way set associative, 256 entries" },
+			{ 0x6C, "DTLB: 2M/4M pages, 8-way set associative, 128 entries" },
+			{ 0x6D, "DTLB: 1 GByte pages, fully associative, 16 entries" },
+			{ 0x70, "Trace cache: 12 K-uop, 8-way set associative" },
+			{ 0x71, "Trace cache: 16 K-uop, 8-way set associative" },
+			{ 0x72, "Trace cache: 32 K-uop, 8-way set associative" },
+			{ 0x76, "Instruction TLB: 2M/4M pages, fully associative, 8 entries " },
+			{ 0x78, "2nd-level cache: 1 MByte, 4-way set associative, 64byte line size" },
+			{ 0x79, "2nd-level cache: 128 KByte, 8-way set associative, 64 byte line size, 2 lines per sector" },
+			{ 0x7A, "2nd-level cache: 256 KByte, 8-way set associative, 64 byte line size, 2 lines per sector" },
+			{ 0x7B, "2nd-level cache: 512 KByte, 8-way set associative, 64 byte line size, 2 lines per sector" },
+			{ 0x7C, "2nd-level cache: 1 MByte, 8-way set associative, 64 byte line size, 2 lines per sector" },
+			{ 0x7D, "2nd-level cache: 2 MByte, 8-way set associative, 64byte line size" },
+			{ 0x7F, "2nd-level cache: 512 KByte, 2-way set associative, 64-byte line size" },
+			{ 0x80, "2nd-level cache: 512 KByte, 8-way set associative, 64-byte line size" },
+			{ 0x82, "2nd-level cache: 256 KByte, 8-way set associative, 32 byte line size" },
+			{ 0x83, "2nd-level cache: 512 KByte, 8-way set associative, 32 byte line size" },
+			{ 0x84, "2nd-level cache: 1 MByte, 8-way set associative, 32 byte line size" },
+			{ 0x85, "2nd-level cache: 2 MByte, 8-way set associative, 32 byte line size" },
+			{ 0x86, "2nd-level cache: 512 KByte, 4-way set associative, 64 byte line size" },
+			{ 0x87, "2nd-level cache: 1 MByte, 8-way set associative, 64 byte line size" },
+			{ 0xA0, "DTLB: 4k pages, fully associative, 32 entries" },
+			{ 0xB0, "Instruction TLB: 4 KByte pages, 4-way set associative, 128 entries" },
+			{ 0xB1, "Instruction TLB: 2M pages, 4-way, 8 entries or 4M pages, 4-way, 4 entries" },
+			{ 0xB2, "Instruction TLB: 4KByte pages, 4-way set associative, 64 entries" },
+			{ 0xB3, "Data TLB: 4 KByte pages, 4-way set associative, 128 entries" },
+			{ 0xB4, "Data TLB1: 4 KByte pages, 4-way associative, 256 entries" },
+			{ 0xB5, "Instruction TLB: 4KByte pages, 8-way set associative, 64 entries" },
+			{ 0xB6, "Instruction TLB: 4KByte pages, 8-way set associative, 128 entries" },
+			{ 0xBA, "Data TLB1: 4 KByte pages, 4-way associative, 64 entries" },
+			{ 0xC0, "Data TLB: 4 KByte and 4 MByte pages, 4-way associative, 8 entries" },
+			{ 0xC1, "Shared 2nd-Level TLB: 4 KByte/2MByte pages, 8-way associative, 1024 entries" },
+			{ 0xC2, "DTLB: 4 KByte/2 MByte pages, 4-way associative, 16 entries" },
+			{ 0xC3, "Shared 2nd-Level TLB: 4 KByte /2 MByte pages, 6-way associative, 1536 entries. Also 1GBbyte pages, 4-way, 16 entries." },
+			{ 0xC4, "DTLB: 2M/4M Byte pages, 4-way associative, 32 entries" },
+			{ 0xCA, "Shared 2nd-Level TLB: 4 KByte pages, 4-way associative, 512 entries" },
+			{ 0xD0, "3rd-level cache: 512 KByte, 4-way set associative, 64 byte line size" },
+			{ 0xD1, "3rd-level cache: 1 MByte, 4-way set associative, 64 byte line size" },
+			{ 0xD2, "3rd-level cache: 2 MByte, 4-way set associative, 64 byte line size" },
+			{ 0xD6, "3rd-level cache: 1 MByte, 8-way set associative, 64 byte line size" },
+			{ 0xD7, "3rd-level cache: 2 MByte, 8-way set associative, 64 byte line size" },
+			{ 0xD8, "3rd-level cache: 4 MByte, 8-way set associative, 64 byte line size" },
+			{ 0xDC, "3rd-level cache: 1.5 MByte, 12-way set associative, 64 byte line size" },
+			{ 0xDD, "3rd-level cache: 3 MByte, 12-way set associative, 64 byte line size" },
+			{ 0xDE, "3rd-level cache: 6 MByte, 12-way set associative, 64 byte line size" },
+			{ 0xE2, "3rd-level cache: 2 MByte, 16-way set associative, 64 byte line size" },
+			{ 0xE3, "3rd-level cache: 4 MByte, 16-way set associative, 64 byte line size" },
+			{ 0xE4, "3rd-level cache: 8 MByte, 16-way set associative, 64 byte line size" },
+			{ 0xEA, "3rd-level cache: 12MByte, 24-way set associative, 64 byte line size" },
+			{ 0xEB, "3rd-level cache: 18MByte, 24-way set associative, 64 byte line size" },
+			{ 0xEC, "3rd-level cache: 24MByte, 24-way set associative, 64 byte line size" },
+			{ 0xF0, "64-Byte prefetching" },
+			{ 0xF1, "128-Byte prefetching" }
+		};
 
-		#define STORE_CLASSICAL_NAME(x)		x_sprintf (ChipID.ProcessorName, CHIPNAME_STRING_LENGTH, x)
-		#define STORE_TLBCACHE_INFO(x,y)	x = (x < y) ? y : x
-		#define TLBCACHE_INFO_UNITS			(15)
-		#define CLASSICAL_CPU_FREQ_LOOP		10000000
+		static cache_descr*	CacheLookup_Find(u8 id)
+		{
 
-		#define CPUID_AWARE_COMPILER
+			return NULL;
+		}
 
-		#ifdef CPUID_AWARE_COMPILER
-			#define CPUID_INSTRUCTION		cpuid
-		#else
-			#define CPUID_INSTRUCTION		_asm _emit 0x0f _asm _emit 0xa2
-		#endif
-
-
-		//--------------------------------------------------------------------------------------
-		// Name: Win32 CPU
-		// Desc: Functions CPU information.
-		//--------------------------------------------------------------------------------------
-		class xcpu_info
+		class CPUInfo
 		{
 		public:
-			void			initialize();
+			void initCPUID();
 
-			// Functions.
-			bool			retrieveCPUFeatures ();
-			bool			retrieveCPUIdentity ();
-			bool			retrieveCPUCacheDetails ();
-			bool			retrieveClassicalCPUCacheDetails ();
-			bool			retrieveCPUClockSpeed ();
-			bool			retrieveClassicalCPUClockSpeed ();
-			bool			retrieveCPUExtendedLevelSupport (s32);
-			bool			retrieveExtendedCPUFeatures ();
-			bool			retrieveProcessorSerialNumber ();
-			bool			retrieveCPUPowerManagement ();
-			bool			retrieveClassicalCPUIdentity ();
-			bool			retrieveExtendedCPUIdentity ();
-			bool			doesCPUSupportCPUID ();
 
-			u64				getCPUSpeedInkHz() const;
-			u64				getCPUSpeedInMHz() const;
+			std::string getVendor() { return vendor; }
+			std::string getBrand();
+			int8_t getStepping();
+			int8_t getModel();
+			int8_t getFamily();
+			std::string getProcessorType();
+			uint16_t getExtendedModel();
+			uint32_t getExtendedFamily();
 
-			const char*		getVendorString () const;
-			const char*		getVendorID () const;
-			const char*		getTypeID () const;
-			const char*		getFamilyID () const;
-			const char*		getModelID () const;
-			const char*		getSteppingCode () const;
-			const char*		getExtendedProcessorName () const;
-			const char*		getProcessorSerialNumber () const;
-			s32				getProcessorAPICID () const;
-			s32				getProcessorCacheXSize (u32) const;
-			bool			doesCPUSupportFeature (u32) const;
+			/* ISA extensions listed in ecx register */
+			bool SSE3(void) { __cpuid(registers.data(), 1); return registers[2] & 0x1; }
+			bool PCLMULQDQ(void) { __cpuid(registers.data(), 1); return registers[2] & (0x1 << 1); }
+			bool DTES64(void) { __cpuid(registers.data(), 1); return registers[2] & (0x1 << 2); }
+			bool MONITOR(void) { __cpuid(registers.data(), 1); return registers[2] & (0x1 << 3); }
+			bool DS_CPL(void) { __cpuid(registers.data(), 1); return registers[2] & (0x1 << 4); }
+			bool VMX(void) { __cpuid(registers.data(), 1); return registers[2] & (0x1 << 5); }
+			bool SMX(void) { __cpuid(registers.data(), 1); return registers[2] & (0x1 << 6); }
+			bool EIST(void) { __cpuid(registers.data(), 1); return registers[2] & (0x1 << 7); }
+			bool TM2(void) { __cpuid(registers.data(), 1); return registers[2] & (0x1 << 8); }
+			bool SSSE3(void) { __cpuid(registers.data(), 1); return registers[2] & (0x1 << 9); }
+			bool CNXT_ID(void) { __cpuid(registers.data(), 1); return registers[2] & (0x1 << 10); }
+			bool SDBG(void) { __cpuid(registers.data(), 1); return registers[2] & (0x1 << 11); }
+			bool FMA(void) { __cpuid(registers.data(), 1); return registers[2] & (0x1 << 12); }
+			bool CMPXCHG16B(void) { __cpuid(registers.data(), 1); return registers[2] & (0x1 << 13); }
+			bool xTPR(void) { __cpuid(registers.data(), 1); return registers[2] & (0x1 << 14); }
+			bool PDCM(void) { __cpuid(registers.data(), 1); return registers[2] & (0x1 << 15); }
+			bool PCID(void) { __cpuid(registers.data(), 1); return registers[2] & (0x1 << 17); }
+			bool DCA(void) { __cpuid(registers.data(), 1); return registers[2] & (0x1 << 18); }
+			bool SSE41(void) { __cpuid(registers.data(), 1); return registers[2] & (0x1 << 19); }
+			bool SSE42(void) { __cpuid(registers.data(), 1); return registers[2] & (0x1 << 20); }
+			bool x2APIC(void) { __cpuid(registers.data(), 1); return registers[2] & (0x1 << 21); }
+			bool MOVBE(void) { __cpuid(registers.data(), 1); return registers[2] & (0x1 << 22); }
+			bool POPCNT(void) { __cpuid(registers.data(), 1); return registers[2] & (0x1 << 23); }
+			bool TSC_Deadline(void) { __cpuid(registers.data(), 1); return registers[2] & (0x1 << 24); }
+			bool AESNI(void) { __cpuid(registers.data(), 1); return registers[2] & (0x1 << 25); }
+			bool XSAVE(void) { __cpuid(registers.data(), 1); return registers[2] & (0x1 << 26); }
+			bool OSXSAVE(void) { __cpuid(registers.data(), 1); return registers[2] & (0x1 << 27); }
+			bool AVX(void) { __cpuid(registers.data(), 1); return registers[2] & (0x1 << 28); }
+			bool F16C(void) { __cpuid(registers.data(), 1); return registers[2] & (0x1 << 29); }
+			bool RDRAND(void) { __cpuid(registers.data(), 1); return registers[2] & (0x1 << 30); }
 
-			s32				getPhysicalProcessors () const;
-			s32				getLogicalProcessorsPerPhysical () const;
-			u64				getProcessorClockFrequency () const;
+			/* ISA extensions listed in edx register */
+			bool FPU(void) { __cpuid(registers.data(), 1); return registers[3] & 0x1; }
+			bool VME(void) { __cpuid(registers.data(), 1); return registers[3] & (0x1 << 1); }
+			bool DE(void) { __cpuid(registers.data(), 1); return registers[3] & (0x1 << 2); }
+			bool PSE(void) { __cpuid(registers.data(), 1); return registers[3] & (0x1 << 3); }
+			bool TSC(void) { __cpuid(registers.data(), 1); return registers[3] & (0x1 << 4); }
+			bool MSR(void) { __cpuid(registers.data(), 1); return registers[3] & (0x1 << 5); }
+			bool PAE(void) { __cpuid(registers.data(), 1); return registers[3] & (0x1 << 6); }
+			bool MCE(void) { __cpuid(registers.data(), 1); return registers[3] & (0x1 << 7); }
+			bool CX8(void) { __cpuid(registers.data(), 1); return registers[3] & (0x1 << 8); }
+			bool APIC(void) { __cpuid(registers.data(), 1); return registers[3] & (0x1 << 9); }
+			bool SEP(void) { __cpuid(registers.data(), 1); return registers[3] & (0x1 << 11); }
+			bool MTRR(void) { __cpuid(registers.data(), 1); return registers[3] & (0x1 << 12); }
+			bool PGE(void) { __cpuid(registers.data(), 1); return registers[3] & (0x1 << 13); }
+			bool MCA(void) { __cpuid(registers.data(), 1); return registers[3] & (0x1 << 14); }
+			bool CMOV(void) { __cpuid(registers.data(), 1); return registers[3] & (0x1 << 15); }
+			bool PAT(void) { __cpuid(registers.data(), 1); return registers[3] & (0x1 << 16); }
+			bool PSE_36(void) { __cpuid(registers.data(), 1); return registers[3] & (0x1 << 17); }
+			bool PSN(void) { __cpuid(registers.data(), 1); return registers[3] & (0x1 << 18); }
+			bool CLFSH(void) { __cpuid(registers.data(), 1); return registers[3] & (0x1 << 19); }
+			bool DS(void) { __cpuid(registers.data(), 1); return registers[3] & (0x1 << 21); }
+			bool ACPI(void) { __cpuid(registers.data(), 1); return registers[3] & (0x1 << 22); }
+			bool MMX(void) { __cpuid(registers.data(), 1); return registers[3] & (0x1 << 23); }
+			bool FXSR(void) { __cpuid(registers.data(), 1); return registers[3] & (0x1 << 24); }
+			bool SSE(void) { __cpuid(registers.data(), 1); return registers[3] & (0x1 << 25); }
+			bool SSE2(void) { __cpuid(registers.data(), 1); return registers[3] & (0x1 << 26); }
+			bool SS(void) { __cpuid(registers.data(), 1); return registers[3] & (0x1 << 27); }
+			bool HTT(void) { __cpuid(registers.data(), 1); return registers[3] & (0x1 << 28); }
+			bool TM(void) { __cpuid(registers.data(), 1); return registers[3] & (0x1 << 29); }
+			bool PBE(void) { __cpuid(registers.data(), 1); return registers[3] & (0x1 << 31); }
+
+			/* Extended Features */
+			bool FSGSBASE(void) { __cpuidex(registers.data(), 7, 0); return registers[1] & (0x1 << 0); }
+			bool SGX(void) { __cpuidex(registers.data(), 7, 0); return registers[1] & (0x1 << 2); }
+			bool BMI1(void) { __cpuidex(registers.data(), 7, 0); return registers[1] & (0x1 << 3); }
+			bool HLE(void) { __cpuidex(registers.data(), 7, 0); return registers[1] & (0x1 << 4); }
+			bool AVX2(void) { __cpuidex(registers.data(), 7, 0); return registers[1] & (0x1 << 5); }
+			bool BMI2(void) { __cpuidex(registers.data(), 7, 0); return registers[1] & (0x1 << 8); }
+			bool RTM(void) { __cpuidex(registers.data(), 7, 0); return registers[1] & (0x1 << 11); }
+			bool RDT_M(void) { __cpuidex(registers.data(), 7, 0); return registers[1] & (0x1 << 12); }
+			bool MPX(void) { __cpuidex(registers.data(), 7, 0); return registers[1] & (0x1 << 14); }
+			bool RDT_A(void) { __cpuidex(registers.data(), 7, 0); return registers[1] & (0x1 << 15); }
+			bool RDSEED(void) { __cpuidex(registers.data(), 7, 0); return registers[1] & (0x1 << 18); }
+			bool ADX(void) { __cpuidex(registers.data(), 7, 0); return registers[1] & (0x1 << 19); }
+			bool SMAP(void) { __cpuidex(registers.data(), 7, 0); return registers[1] & (0x1 << 20); }
+			bool IPT(void) { __cpuidex(registers.data(), 7, 0); return registers[1] & (0x1 << 25); }
+			bool SHA(void) { __cpuidex(registers.data(), 7, 0); return registers[1] & (0x1 << 29); }
+
+
+
+			/* Thermal and Power Management */
+			bool DigitalTemp(void) { __cpuid(registers.data(), 6); return registers[0] & (0x1 << 0); }
+			bool TurboBoost(void) { __cpuid(registers.data(), 6); return registers[0] & (0x1 << 1); }
+			bool ARAT(void) { __cpuid(registers.data(), 6); return registers[0] & (0x1 << 2); }
+			bool PLN(void) { __cpuid(registers.data(), 6); return registers[0] & (0x1 << 4); }
+			bool ECMD(void) { __cpuid(registers.data(), 6); return registers[0] & (0x1 << 5); }
+			bool PTM(void) { __cpuid(registers.data(), 6); return registers[0] & (0x1 << 6); }
+
+
+
+			std::string getCacheTopology();
+
 
 		private:
-			bool	mIsInitialized;
-			u64		mCPUSpeedInkHz; 
+			void CPUIDExtended();
 
-			struct ID
-			{
-				s32 Type;
-				s32 Family;
-				s32 Model;
-				s32 Revision;
-				s32 ExtendedFamily;
-				s32 ExtendedModel;
-				char ProcessorName[CHIPNAME_STRING_LENGTH];
-				char Vendor[VENDOR_STRING_LENGTH];
-				char SerialNumber[SERIALNUMBER_STRING_LENGTH];
-			};
+			std::array<int32_t, 4> getCPUID(std::array<int32_t, 4> regs, int32_t eax, int32_t ecx);
+			std::string getCacheInfo();
+			int MaxInputBasicCPUID;
+			int MaxInputExtendedCPUID;
 
-			struct CPUPowerManagement
-			{
-				bool HasVoltageID;
-				bool HasFrequencyID;
-				bool HasTempSenseDiode;
-			};
+			std::array<int32_t, 4> registers; //will hold data from eax, ebx, ecx, edx
 
-			struct CPUExtendedFeatures
-			{
-				bool Has3DNow;
-				bool Has3DNowPlus;
-				bool SupportsMP;
-				bool HasMMXPlus;
-				bool HasSSEMMX;
-				bool SupportsHyperthreading;
-				s32 NumCores;
-				s32 LogicalProcessorsPerPhysical;
-				s32 APIC_ID;
-				CPUPowerManagement PowerManagement;
-			};	
-
-			struct CPUFeatures
-			{
-				bool HasFPU;
-				bool HasTSC;
-				bool HasMMX;
-				bool HasSSE;
-				bool HasSSEFP;
-				bool HasSSE2;
-				bool HasIA64;
-				bool HasAPIC;
-				bool HasCMOV;
-				bool HasMTRR;
-				bool HasACPI;
-				bool HasSerial;
-				bool HasThermal;
-				s32 CPUSpeed;
-				s32 L1CacheSize;
-				s32 L2CacheSize;
-				s32 L3CacheSize;
-				CPUExtendedFeatures ExtendedFeatures;
-			};
-
-			enum Manufacturer 
-			{
-				AMD, Intel, NSC, UMC, Cyrix, NexGen, IDT, Rise, Transmeta, UnknownManufacturer
-			};
-
-			// Variables.
-			Manufacturer	ChipManufacturer;
-			CPUFeatures		Features;
-			ID				ChipID;
+			std::string vendor;
+			std::string brand;
 		};
-		
-		typedef	void (*DELAY_FUNC)(u32 uiMS);
-		static void cpuSpeed_Delay (u32 uiMS);
-		static void cpuSpeed_DelayOverhead (u32 uiMS);
-
-		static s64 getCyclesDifference (DELAY_FUNC DelayFunction, u32 uiParameter);
 
 
-		void	xcpu_info::initialize()
+#define CHECK_BIT(var,pos) ((var) & (1<<(pos))
+#define MASK_LOWBYTE(var)  ((var) & 0xff)
+
+
+		void CPUInfo::initCPUID()
 		{
-			if (mIsInitialized)
-				return;
 
-			// Check to see if this processor supports CPUID.
-			if (doesCPUSupportCPUID ())
+			int32_t* startOfArray = registers.data(); //get the starting address of the array
+			__cpuid(startOfArray, 0);
+			MaxInputBasicCPUID = registers[0]; //number of standard CPUID leafs
+
+			char vend[0x18] = { 0 }; //initialize a char array for the max length of the vendor string
+			int count = 0;
+
+			//per Intel documentation vendor name stored in ebx, edx, ecx -- need to switch order in array
+			int32_t temp = registers[3]; //edx
+			registers[3] = registers[2];
+			registers[2] = temp;
+
+
+			for (int i = 1; i < 4; i++)
 			{
-				// Retrieve the CPU details.
-				retrieveCPUIdentity ();
-				retrieveCPUFeatures ();
-				if (!retrieveCPUClockSpeed ()) 
-					retrieveClassicalCPUClockSpeed ();
-
-				// Attempt to retrieve cache information.
-				if (!retrieveCPUCacheDetails ()) 
-					retrieveClassicalCPUCacheDetails ();
-
-				// Retrieve the extended CPU details.
-				if (!retrieveExtendedCPUIdentity ())
-					retrieveClassicalCPUIdentity ();
-				retrieveExtendedCPUFeatures ();
-
-				// Now attempt to retrieve the serial number (if possible).
-				retrieveProcessorSerialNumber ();
+				for (int j = 0; j < 4; j++)
+				{
+					vend[count] = (char)registers[i]; // get the lowest order byte
+					registers[i] = registers[i] >> 8;
+					count++;
+				}
 			}
+			vendor = vend;
 
-			u32 uiRepetitions = 1;
-			u32 uiMSecPerRepetition = 50;
-			s64	i64Total = 0, i64Overhead = 0;
-
-			for (u32 nCounter = 0; nCounter < uiRepetitions; nCounter ++) 
-			{
-				i64Total    += getCyclesDifference (cpuSpeed_Delay, uiMSecPerRepetition);
-				i64Overhead += getCyclesDifference (cpuSpeed_DelayOverhead, uiMSecPerRepetition);
-			}
-
-			// Calculate the MHz speed.
-			i64Total -= i64Overhead;
-			i64Total /= uiRepetitions;
-			i64Total /= uiMSecPerRepetition;
-
-			// Save the CPU speed.
-			mCPUSpeedInkHz = i64Total;
-
-
-			mIsInitialized = true;
+			CPUIDExtended();
+			startOfArray = nullptr; //clean dangling pointer
 		}
 
 
-		inline static bool	cpuID(u32 i, u32 regs[4])
+		void CPUInfo::CPUIDExtended()
 		{
-#if defined(TARGET_PC)
-			u32 reg0,reg1,reg2,reg3;
-#ifdef CPUID_AWARE_COMPILER
-			_asm 
+			std::array<int32_t, 4> extendedRegisters;
+			int32_t* startOfArray = extendedRegisters.data();
+
+			int32_t extended = 0x80000000;
+			__cpuid(startOfArray, extended);
+			MaxInputExtendedCPUID = extendedRegisters[0];
+
+			for (int k = extended + 1; k<MaxInputExtendedCPUID; k++)
 			{
-				; we must push/pop the registers <<CPUID>> writes to, as the
-				; optimiser doesn't know about <<CPUID>>, and so doesn't expect
-				; these registers to change.
-				push eax
-				push ebx
-				push ecx
-				push edx
-#endif
-				rdtsc
-
-				; <<CPUID>> 
-				; eax = 1 --> eax: CPU ID - bits 31..16 - unused, bits 15..12 - type, bits 11..8 - family, bits 7..4 - model, bits 3..0 - mask revision
-				;			  ebx: 31..24 - default APIC ID, 23..16 - logical processsor ID, 15..8 - CFLUSH chunk size , 7..0 - brand ID
-				;			  edx: CPU feature flags
-				mov eax,i
-				CPUID_INSTRUCTION
-				mov reg3, edx
-				mov reg2, ecx
-				mov reg1, ebx
-				mov reg0, eax
-
-#ifdef CPUID_AWARE_COMPILER
-				pop edx
-				pop ecx
-				pop ebx
-				pop eax
-#endif
+				__cpuid(startOfArray, k);
 			}
-			regs[0]=reg0; regs[1]=reg1; regs[2]=reg2; regs[3]=reg3;
-			return true;
-#else
-			regs[0]=regs[1]=regs[2]=regs[3]=0;
-			return false;
-#endif
-		}
-			
-		inline static bool cpuID(u32 i, u32 *reg0, u32 *reg1, u32 *reg2, u32 *reg3)
-		{
-			u32 regs[4];
-			if (!cpuID(i, regs))
-				return false;
-			if (reg0!=NULL) *reg0 = regs[0];
-			if (reg1!=NULL) *reg1 = regs[1];
-			if (reg2!=NULL) *reg2 = regs[2];
-			if (reg3!=NULL) *reg3 = regs[3];
-			return true;
 		}
 
-		bool xcpu_info::retrieveCPUFeatures ()
+
+		int8_t CPUInfo::getStepping()
 		{
-			u32 CPUFeatures = 0;
-			u32 CPUAdvanced = 0;
-			if (!cpuID(1, NULL, &CPUAdvanced, NULL, &CPUFeatures))
-				return false;
+			__cpuid(registers.data(), 0x1);
+			return registers[0] & 0xf;
+		}
 
-			// Retrieve the features of CPU present.
-			Features.HasFPU =		((CPUFeatures & 0x00000001) != 0);		// FPU Present --> Bit 0
-			Features.HasTSC =		((CPUFeatures & 0x00000010) != 0);		// TSC Present --> Bit 4
-			Features.HasAPIC =		((CPUFeatures & 0x00000200) != 0);		// APIC Present --> Bit 9
-			Features.HasMTRR =		((CPUFeatures & 0x00001000) != 0);		// MTRR Present --> Bit 12
-			Features.HasCMOV =		((CPUFeatures & 0x00008000) != 0);		// CMOV Present --> Bit 15
-			Features.HasSerial =	((CPUFeatures & 0x00040000) != 0);		// Serial Present --> Bit 18
-			Features.HasACPI =		((CPUFeatures & 0x00400000) != 0);		// ACPI Capable --> Bit 22
-			Features.HasMMX =		((CPUFeatures & 0x00800000) != 0);		// MMX Present --> Bit 23
-			Features.HasSSE =		((CPUFeatures & 0x02000000) != 0);		// SSE Present --> Bit 25
-			Features.HasSSE2 =		((CPUFeatures & 0x04000000) != 0);		// SSE2 Present --> Bit 26
-			Features.HasThermal =	((CPUFeatures & 0x20000000) != 0);		// Thermal Monitor Present --> Bit 29
-			Features.HasIA64 =		((CPUFeatures & 0x40000000) != 0);		// IA64 Present --> Bit 30
+		int8_t CPUInfo::getModel()
+		{
+			__cpuid(registers.data(), 0x1);
+			int8_t mod = (registers[0] & 0xf0) >> 4;
+			return mod;
+		}
 
-			// Retrieve extended SSE capabilities if SSE is available.
-			if (Features.HasSSE)
+		int8_t CPUInfo::getFamily()
+		{
+			__cpuid(registers.data(), 0x1);
+			return (registers[0] & 0xf00) >> 8;
+		}
+
+		uint16_t CPUInfo::getExtendedModel()
+		{
+			int8_t family = getFamily();
+			if (family == 0x6 || family == 0xf)
 			{
-				// Attempt to CPU_INFO_TRY some SSE FP instructions.
-				CPU_INFO_TRY
-				{
-					// Perform: orps xmm0, xmm0
-					_asm
-					{
-						_emit 0x0f
-							_emit 0x56
-							_emit 0xc0	
-					}
-
-					// SSE FP capable processor.
-					Features.HasSSEFP = true;
-				}
-
-				// A generic catch-all just to be sure...
-				CPU_INFO_CATCH_ALL
-				{
-					// bad instruction - processor or OS cannot handle SSE FP.
-					Features.HasSSEFP = false;
-				}
-			} 
-			else 
-			{
-				// Set the advanced SSE capabilities to not available.
-				Features.HasSSEFP = false;
+				__cpuid(registers.data(), 0x1);
+				uint32_t extMod = (registers[0] & 0xf0000) >> 12;
+				uint16_t displayModel = extMod + getModel();
+				while ((displayModel & 0x1) == 0)
+					displayModel >>= 1;
+				return displayModel;
 			}
+			else return getModel();
+		}
 
-			// Retrieve Intel specific extended features.
-			if (ChipManufacturer == Intel)
-			{
-				Features.ExtendedFeatures.SupportsHyperthreading =	((CPUFeatures &	0x10000000) != 0);	// Intel specific: Hyperthreading --> Bit 28
-				Features.ExtendedFeatures.LogicalProcessorsPerPhysical = (Features.ExtendedFeatures.SupportsHyperthreading) ? ((CPUAdvanced & 0x00FF0000) >> 16) : 1;
+		std::array<int32_t, 4> CPUInfo::getCPUID(std::array<int32_t, 4> regs, int32_t eax, int32_t ecx)
+		{
+			__cpuidex(regs.data(), eax, ecx);
+			return regs;
+		}
 
-				if ((Features.ExtendedFeatures.SupportsHyperthreading) && (Features.HasAPIC))
-				{
-					// Retrieve APIC information if there is one present.
-					Features.ExtendedFeatures.APIC_ID = ((CPUAdvanced & 0xFF000000) >> 24);
-				}
-			}
+
+		uint32_t CPUInfo::getExtendedFamily()
+		{
+			if (getFamily() != 0xf)
+				return getFamily();
 			else
 			{
-				Features.ExtendedFeatures.SupportsHyperthreading = false;
-				Features.ExtendedFeatures.LogicalProcessorsPerPhysical = 1;
+				(getCPUID(registers, 0x1, 0x0));
+				uint32_t displayModel = registers[0] & 0xff00000 + getFamily();
+				while ((displayModel & 0x1) == 0)
+					displayModel >>= 1;
+				return displayModel;
 			}
-
-			// Physical cores
-			u32 NumCores = Features.ExtendedFeatures.LogicalProcessorsPerPhysical;
-			if (ChipManufacturer == Intel)
-			{
-				cpuID(4, &NumCores, NULL, NULL, NULL);
-				NumCores = 1 + ((NumCores >> 26) & 0x3F);
-			}
-			else if (ChipManufacturer == AMD)
-			{
-				u32 NumCores = 0;
-				cpuID(0x80000008, NULL, NULL, &NumCores, NULL);
-				NumCores = 1 + NumCores & 0xFF;
-			}
-
-			Features.ExtendedFeatures.NumCores = NumCores;
-
-			return true;
 		}
 
-		bool xcpu_info::retrieveCPUIdentity ()
+		std::string CPUInfo::getProcessorType()
 		{
-			u32 CPUVendor[3];
-			u32 CPUSignature;
-
-			// CPU vendor
-			if (!cpuID(0, NULL, &CPUVendor[0], &CPUVendor[2], &CPUVendor[1]))
-				return false;
-			if (!cpuID(1, &CPUSignature, NULL, NULL, NULL))
-				return false;
-
-			// Process the returned information.
-			x_memcpy (ChipID.Vendor, &(CPUVendor[0]), sizeof (s32));
-			x_memcpy (&(ChipID.Vendor[4]), &(CPUVendor[1]), sizeof (s32));
-			x_memcpy (&(ChipID.Vendor[8]), &(CPUVendor[2]), sizeof (s32));
-			ChipID.Vendor[12] = '\0';
-
-			// Attempt to retrieve the manufacturer from the vendor string.
-			if (x_strcmp (ChipID.Vendor, "GenuineIntel") == 0)		ChipManufacturer = Intel;				// Intel Corp.
-			else if (x_strcmp (ChipID.Vendor, "UMC UMC UMC ") == 0)	ChipManufacturer = UMC;					// United Microelectronics Corp.
-			else if (x_strcmp (ChipID.Vendor, "AuthenticAMD") == 0)	ChipManufacturer = AMD;					// Advanced Micro Devices
-			else if (x_strcmp (ChipID.Vendor, "AMD ISBETTER") == 0)	ChipManufacturer = AMD;					// Advanced Micro Devices (1994)
-			else if (x_strcmp (ChipID.Vendor, "CyrixInstead") == 0)	ChipManufacturer = Cyrix;				// Cyrix Corp., VIA Inc.
-			else if (x_strcmp (ChipID.Vendor, "NexGenDriven") == 0)	ChipManufacturer = NexGen;				// NexGen Inc. (now AMD)
-			else if (x_strcmp (ChipID.Vendor, "CentaurHauls") == 0)	ChipManufacturer = IDT;					// IDT/Centaur (now VIA)
-			else if (x_strcmp (ChipID.Vendor, "RiseRiseRise") == 0)	ChipManufacturer = Rise;				// Rise
-			else if (x_strcmp (ChipID.Vendor, "GenuineTMx86") == 0)	ChipManufacturer = Transmeta;			// Transmeta
-			else if (x_strcmp (ChipID.Vendor, "TransmetaCPU") == 0)	ChipManufacturer = Transmeta;			// Transmeta
-			else if (x_strcmp (ChipID.Vendor, "Geode By NSC") == 0)	ChipManufacturer = NSC;					// National Semiconductor
-			else													ChipManufacturer = UnknownManufacturer;	// Unknown manufacturer
-
-			// Retrieve the family of CPU present.
-			ChipID.ExtendedFamily =		((CPUSignature & 0x0FF00000) >> 20);	// Bits 27..20 Used
-			ChipID.ExtendedModel =		((CPUSignature & 0x000F0000) >> 16);	// Bits 19..16 Used
-			ChipID.Type =				((CPUSignature & 0x0000F000) >> 12);	// Bits 15..12 Used
-			ChipID.Family =				((CPUSignature & 0x00000F00) >> 8);		// Bits 11..8 Used
-			ChipID.Model =				((CPUSignature & 0x000000F0) >> 4);		// Bits 7..4 Used
-			ChipID.Revision =			((CPUSignature & 0x0000000F) >> 0);		// Bits 3..0 Used
-
-			return true;
+			getCPUID(registers, 0x1, 0x0);
+			int8_t type = (registers[0] & 0x3000) >> 0xC;
+			if (type == 0b00) return "Original OEM Processor";
+			else if (type == 0b01) return "Intel OverDrive Processor";
+			else if (type == 0b10) return "Dual Processor";
+			return "Intel Reserved";
 		}
 
-		bool xcpu_info::retrieveCPUCacheDetails ()
+
+		std::string CPUInfo::getBrand()
 		{
-			u32 L1Cache[4] = { 0, 0, 0, 0 };
-			u32 L2Cache[4] = { 0, 0, 0, 0 };
+			__cpuid(registers.data(), 0x80000000);
+			if (registers[0] < 0x80000004) return NULL;
 
-			// Check to see if what we are about to do is supported...
-			if (retrieveCPUExtendedLevelSupport (0x80000005)) 
-			{
-				if (!cpuID(0x80000005, &L1Cache[0], &L1Cache[1], &L1Cache[2], &L1Cache[3]))
-					return false;
+			const int CPUID_Leaves = 3;
+			const int registersNeeded = 4;
+			int encodedBrand[CPUID_Leaves][registersNeeded];
 
-				// Save the L1 data cache size (in KB) from ecx: bits 31..24 as well as data cache size from edx: bits 31..24.
-				Features.L1CacheSize = ((L1Cache[2] & 0xFF000000) >> 24);
-				Features.L1CacheSize += ((L1Cache[3] & 0xFF000000) >> 24);
-			}
-			else 
+			for (int i = 0; i <= 2; i++)
 			{
-				// Store -1 to indicate the cache could not be queried.
-				Features.L1CacheSize = -1;
+				__cpuid(registers.data(), i + 0x80000002);
+
+				for (int j = 0; j<registersNeeded; j++)
+					encodedBrand[i][j] = registers[j];
 			}
 
-			// Check to see if what we are about to do is supported...
-			if (retrieveCPUExtendedLevelSupport (0x80000006))
+			std::string brand = "";
+
+			//outside loop for 3 exteneded CPUID leaves
+			for (int ii = 0; ii < 3; ii++)
 			{
-				if (!cpuID(0x80000006, &L2Cache[0], &L2Cache[1], &L2Cache[2], &L2Cache[3]))
-					return false;
-
-				// Save the L2 unified cache size (in KB) from ecx: bits 31..16.
-				Features.L2CacheSize = ((L2Cache[2] & 0xFFFF0000) >> 16);
-			}
-			else
-			{
-				// Store -1 to indicate the cache could not be queried.
-				Features.L2CacheSize = -1;
-			}
-
-			// Define L3 as being not present as we cannot test for it.
-			Features.L3CacheSize = -1;
-
-			// Return failure if we cannot detect either cache with this method.
-			return ((Features.L1CacheSize == -1) && (Features.L2CacheSize == -1)) ? false : true;
-		}
-
-		bool xcpu_info::retrieveClassicalCPUCacheDetails ()
-		{
-			u32 TLBCode = -1, TLBData = -1, L1Code = -1, L1Data = -1, L1Trace = -1, L2Unified = -1, L3Unified = -1;
-			u32 TLBCacheData[4] = { 0, 0, 0, 0 };
-			u32 TLBPassCounter = 0;
-			u32 TLBCacheUnit = 0;
-
-			do 
-			{
-				if (!cpuID(2, &TLBCacheData[0], &TLBCacheData[1], &TLBCacheData[2], &TLBCacheData[3]))
-					return false;
-
-				s32 bob = ((TLBCacheData[0] & 0x00FF0000) >> 16);
-
-				// Process the returned TLB and cache information.
-				for (s32 nCounter = 0; nCounter < TLBCACHE_INFO_UNITS; nCounter ++) 
+				//loop for the 4 registers at each leaf
+				for (int jj = 0; jj < 4; jj++)
 				{
-					// First of all - decide which unit we are dealing with.
-					switch (nCounter)
+					//inner loop for 4 bytes in each register
+					for (int kk = 0; kk<4; kk++)
 					{
-						// eax: bits 8..15 : bits 16..23 : bits 24..31
-					case 0: TLBCacheUnit = ((TLBCacheData[0] & 0x0000FF00) >> 8); break;
-					case 1: TLBCacheUnit = ((TLBCacheData[0] & 0x00FF0000) >> 16); break;
-					case 2: TLBCacheUnit = ((TLBCacheData[0] & 0xFF000000) >> 24); break;
-
-						// ebx: bits 0..7 : bits 8..15 : bits 16..23 : bits 24..31
-					case 3: TLBCacheUnit = ((TLBCacheData[1] & 0x000000FF) >> 0); break;
-					case 4: TLBCacheUnit = ((TLBCacheData[1] & 0x0000FF00) >> 8); break;
-					case 5: TLBCacheUnit = ((TLBCacheData[1] & 0x00FF0000) >> 16); break;
-					case 6: TLBCacheUnit = ((TLBCacheData[1] & 0xFF000000) >> 24); break;
-
-						// ecx: bits 0..7 : bits 8..15 : bits 16..23 : bits 24..31
-					case 7: TLBCacheUnit = ((TLBCacheData[2] & 0x000000FF) >> 0); break;
-					case 8: TLBCacheUnit = ((TLBCacheData[2] & 0x0000FF00) >> 8); break;
-					case 9: TLBCacheUnit = ((TLBCacheData[2] & 0x00FF0000) >> 16); break;
-					case 10: TLBCacheUnit = ((TLBCacheData[2] & 0xFF000000) >> 24); break;
-
-						// edx: bits 0..7 : bits 8..15 : bits 16..23 : bits 24..31
-					case 11: TLBCacheUnit = ((TLBCacheData[3] & 0x000000FF) >> 0); break;
-					case 12: TLBCacheUnit = ((TLBCacheData[3] & 0x0000FF00) >> 8); break;
-					case 13: TLBCacheUnit = ((TLBCacheData[3] & 0x00FF0000) >> 16); break;
-					case 14: TLBCacheUnit = ((TLBCacheData[3] & 0xFF000000) >> 24); break;
-
-						// Default case - an error has occurred.
-					default: return false;
+						if (encodedBrand[ii][jj] == 0x20202020) continue; //skip over excessive empty space
+						brand += MASK_LOWBYTE(encodedBrand[ii][jj]);
+						encodedBrand[ii][jj] >>= 8;
 					}
 
-					// Now process the resulting unit to see what it means....
-					switch (TLBCacheUnit)
-					{
-					case 0x00: break;
-					case 0x01: STORE_TLBCACHE_INFO (TLBCode, 4); break;
-					case 0x02: STORE_TLBCACHE_INFO (TLBCode, 4096); break;
-					case 0x03: STORE_TLBCACHE_INFO (TLBData, 4); break;
-					case 0x04: STORE_TLBCACHE_INFO (TLBData, 4096); break;
-					case 0x06: STORE_TLBCACHE_INFO (L1Code, 8); break;
-					case 0x08: STORE_TLBCACHE_INFO (L1Code, 16); break;
-					case 0x0a: STORE_TLBCACHE_INFO (L1Data, 8); break;
-					case 0x0c: STORE_TLBCACHE_INFO (L1Data, 16); break;
-					case 0x10: STORE_TLBCACHE_INFO (L1Data, 16); break;			// <-- FIXME: IA-64 Only
-					case 0x15: STORE_TLBCACHE_INFO (L1Code, 16); break;			// <-- FIXME: IA-64 Only
-					case 0x1a: STORE_TLBCACHE_INFO (L2Unified, 96); break;		// <-- FIXME: IA-64 Only
-					case 0x22: STORE_TLBCACHE_INFO (L3Unified, 512); break;
-					case 0x23: STORE_TLBCACHE_INFO (L3Unified, 1024); break;
-					case 0x25: STORE_TLBCACHE_INFO (L3Unified, 2048); break;
-					case 0x29: STORE_TLBCACHE_INFO (L3Unified, 4096); break;
-					case 0x39: STORE_TLBCACHE_INFO (L2Unified, 128); break;
-					case 0x3c: STORE_TLBCACHE_INFO (L2Unified, 256); break;
-					case 0x40: STORE_TLBCACHE_INFO (L2Unified, 0); break;		// <-- FIXME: No integrated L2 cache (P6 core) or L3 cache (P4 core).
-					case 0x41: STORE_TLBCACHE_INFO (L2Unified, 128); break;
-					case 0x42: STORE_TLBCACHE_INFO (L2Unified, 256); break;
-					case 0x43: STORE_TLBCACHE_INFO (L2Unified, 512); break;
-					case 0x44: STORE_TLBCACHE_INFO (L2Unified, 1024); break;
-					case 0x45: STORE_TLBCACHE_INFO (L2Unified, 2048); break;
-					case 0x50: STORE_TLBCACHE_INFO (TLBCode, 4096); break;
-					case 0x51: STORE_TLBCACHE_INFO (TLBCode, 4096); break;
-					case 0x52: STORE_TLBCACHE_INFO (TLBCode, 4096); break;
-					case 0x5b: STORE_TLBCACHE_INFO (TLBData, 4096); break;
-					case 0x5c: STORE_TLBCACHE_INFO (TLBData, 4096); break;
-					case 0x5d: STORE_TLBCACHE_INFO (TLBData, 4096); break;
-					case 0x66: STORE_TLBCACHE_INFO (L1Data, 8); break;
-					case 0x67: STORE_TLBCACHE_INFO (L1Data, 16); break;
-					case 0x68: STORE_TLBCACHE_INFO (L1Data, 32); break;
-					case 0x70: STORE_TLBCACHE_INFO (L1Trace, 12); break;
-					case 0x71: STORE_TLBCACHE_INFO (L1Trace, 16); break;
-					case 0x72: STORE_TLBCACHE_INFO (L1Trace, 32); break;
-					case 0x77: STORE_TLBCACHE_INFO (L1Code, 16); break;			// <-- FIXME: IA-64 Only
-					case 0x79: STORE_TLBCACHE_INFO (L2Unified, 128); break;
-					case 0x7a: STORE_TLBCACHE_INFO (L2Unified, 256); break;
-					case 0x7b: STORE_TLBCACHE_INFO (L2Unified, 512); break;
-					case 0x7c: STORE_TLBCACHE_INFO (L2Unified, 1024); break;
-					case 0x7e: STORE_TLBCACHE_INFO (L2Unified, 256); break;
-					case 0x81: STORE_TLBCACHE_INFO (L2Unified, 128); break;
-					case 0x82: STORE_TLBCACHE_INFO (L2Unified, 256); break;
-					case 0x83: STORE_TLBCACHE_INFO (L2Unified, 512); break;
-					case 0x84: STORE_TLBCACHE_INFO (L2Unified, 1024); break;
-					case 0x85: STORE_TLBCACHE_INFO (L2Unified, 2048); break;
-					case 0x88: STORE_TLBCACHE_INFO (L3Unified, 2048); break;	// <-- FIXME: IA-64 Only
-					case 0x89: STORE_TLBCACHE_INFO (L3Unified, 4096); break;	// <-- FIXME: IA-64 Only
-					case 0x8a: STORE_TLBCACHE_INFO (L3Unified, 8192); break;	// <-- FIXME: IA-64 Only
-					case 0x8d: STORE_TLBCACHE_INFO (L3Unified, 3096); break;	// <-- FIXME: IA-64 Only
-					case 0x90: STORE_TLBCACHE_INFO (TLBCode, 262144); break;	// <-- FIXME: IA-64 Only
-					case 0x96: STORE_TLBCACHE_INFO (TLBCode, 262144); break;	// <-- FIXME: IA-64 Only
-					case 0x9b: STORE_TLBCACHE_INFO (TLBCode, 262144); break;	// <-- FIXME: IA-64 Only
+				}
+			}
+			return brand;
 
-						// Default case - an error has occurred.
-					default: return false;
+		}
+
+		std::string CPUInfo::getCacheTopology()
+		{
+			__cpuid(registers.data(), 2);
+			uint32_t validCacheData = 0x80000000; //bit 31 of the register will be 0 iff there is a valid 1 byte cache descriptor
+
+			uint8_t highestByte = 0;
+			uint8_t topMiddleByte = 0;
+			uint8_t botMiddleByte = 0;
+			uint8_t bottomByte = 0;
+			std::string cacheTopology;
+			std::string cacheDescriptor = "";
+			for (int i = 0; i<4; i++)
+			{
+
+				if (!CHECK_BIT(registers[i], 31)))
+		{
+			if (i != 0) bottomByte = MASK_LOWBYTE(registers[i]);
+			registers[i] >>= 8;
+			botMiddleByte = MASK_LOWBYTE(registers[i]);
+			registers[i] >>= 8;
+			topMiddleByte = MASK_LOWBYTE(registers[i]);
+			registers[i] >>= 8;
+			highestByte = MASK_LOWBYTE(registers[i]);
+		}
+
+				std::array<uint8_t, 4> cacheCodes = { highestByte ,topMiddleByte, botMiddleByte, bottomByte };
+				for (int j = 0; j < 4; j++)
+				{
+					if (cacheCodes[j] == 0xFF)
+						cacheTopology += getCacheInfo();
+					else if (cacheCodes[j] != 0 && CacheLookup_Find(cacheCodes[j]) != NULL)
+					{
+						cacheDescriptor = CacheLookup_Find(cacheCodes[j])->mDescr;
+						cacheTopology += cacheDescriptor;
+						cacheTopology += "\n";
 					}
+
+				}
+			}
+			return cacheTopology;
+
+		}
+
+
+		std::string CPUInfo::getCacheInfo()
+		{
+
+			registers[0] = 0xffffffff;
+			int count = 0;
+
+			struct Cache /* Struct organized largest element to smallest element to minimize alignment padding */
+			{
+				int32_t numSets;
+				uint32_t CacheSize;
+				int16_t lineSize;
+				int16_t linePartitions;
+				int16_t lineAssociativity;
+				int8_t level;
+				int8_t type;
+				bool selfInit;
+				bool FullyAssoc;
+				bool WriteBack;
+				bool Inclusive;
+				bool Mapping;
+			};
+			std::string cacheDescription = "";
+
+			while (registers[0] != 0x0)
+			{
+				__cpuidex(registers.data(), 0x4, count);
+				Cache cache;
+				cache.type = registers[0] & 0x1F;
+				if (cache.type == 0) break; //no more cache levels
+				cache.level = ((registers[0] & 0xE0) >> 5);
+				cache.selfInit = registers[0] & 0x100;
+				cache.FullyAssoc = registers[0] & 0x200;
+				cache.lineSize = (registers[1] & 0xFFF) + 1;
+				cache.linePartitions = ((registers[1] & 0x3FF000) >> 12) + 1;
+				cache.lineAssociativity = ((registers[1] & 0xFFC00000) >> 22) + 1;
+				cache.numSets = (registers[2] & 0xFFFFFFFF) + 1;
+				cache.WriteBack = registers[3] & 0x1;
+				cache.Inclusive = registers[3] & 0x2;
+				cache.Mapping = registers[3] & 0x4;
+
+				cache.CacheSize = cache.lineAssociativity * cache.lineSize * cache.linePartitions * cache.numSets;
+				int16_t numCores = ((registers[1] & 0xFFC00000) >> 22) + 1; //includes hyperthreaded cores
+				while (numCores % 2 != 0) numCores++; //round-up to nearest power of 2 --> likely ok solution if cores disabled in BIOS
+				if (HTT()) numCores >>= 1; //if hyperthreading, number of physical cores is half -- possible issue on AMD
+
+				std::string postfix;
+				int8_t cachepostfixCount = 0;
+
+				while (cache.CacheSize >= 1024) //find out which is the best size abbreviation
+				{
+					cache.CacheSize >>= 10;
+					cachepostfixCount++;
 				}
 
-				// Increment the TLB pass counter.
-				TLBPassCounter ++;
-
-			} while ((TLBCacheData[0] & 0x000000FF) > TLBPassCounter);
-
-			// Ok - we now have the maximum TLB, L1, L2, and L3 sizes...
-			if ((L1Code == -1) && (L1Data == -1) && (L1Trace == -1)) Features.L1CacheSize = -1;
-			else if ((L1Code == -1) && (L1Data == -1) && (L1Trace != -1)) Features.L1CacheSize = L1Trace;
-			else if ((L1Code != -1) && (L1Data == -1)) Features.L1CacheSize = L1Code;
-			else if ((L1Code == -1) && (L1Data != -1)) Features.L1CacheSize = L1Data;
-			else if ((L1Code != -1) && (L1Data != -1)) Features.L1CacheSize = L1Code + L1Data;
-			else Features.L1CacheSize = -1;
-
-			// Ok - we now have the maximum TLB, L1, L2, and L3 sizes...
-			if (L2Unified == -1) Features.L2CacheSize = -1;
-			else Features.L2CacheSize = L2Unified;
-
-			// Ok - we now have the maximum TLB, L1, L2, and L3 sizes...
-			if (L3Unified == -1) Features.L3CacheSize = -1;
-			else Features.L3CacheSize = L3Unified;
-
-			return true;
-		}
-
-		bool xcpu_info::retrieveCPUClockSpeed ()
-		{
-			// First of all we check to see if the RDTSC (0x0F, 0x31) instruction is supported.
-			if (!Features.HasTSC)
-				return false;
-
-			return true;
-		}
-
-		bool xcpu_info::retrieveClassicalCPUClockSpeed ()
-		{
-			LARGE_INTEGER liStart, liEnd, liCountsPerSecond;
-			double dFrequency, dDifference;
-
-			// Attempt to get a starting tick count.
-			QueryPerformanceCounter (&liStart);
-
-			CPU_INFO_TRY
-			{
-				_asm 
+				switch (cachepostfixCount)
 				{
-					mov eax, 0x80000000
-					mov ebx, CLASSICAL_CPU_FREQ_LOOP
-				Timer_Loop: 
-					bsf ecx,eax
-					dec ebx
-					jnz Timer_Loop
-				}	
-			}
-
-			// A generic catch-all just to be sure...
-			CPU_INFO_CATCH_ALL 
-			{
-				return false;
-			}
-
-			// Attempt to get a starting tick count.
-			QueryPerformanceCounter (&liEnd);
-
-			// Get the difference...  NB: This is in seconds....
-			QueryPerformanceFrequency (&liCountsPerSecond);
-			dDifference = (((double) liEnd.QuadPart - (double) liStart.QuadPart) / (double) liCountsPerSecond.QuadPart);
-
-			// Calculate the clock speed.
-			if (ChipID.Family == 3)
-			{
-				// 80386 processors....  Loop time is 115 cycles!
-				dFrequency = (((CLASSICAL_CPU_FREQ_LOOP * 115) / dDifference) / (1024*1024));
-			} 
-			else if (ChipID.Family == 4)
-			{
-				// 80486 processors....  Loop time is 47 cycles!
-				dFrequency = (((CLASSICAL_CPU_FREQ_LOOP * 47) / dDifference) / (1024*1024));
-			} 
-			else if (ChipID.Family == 5) 
-			{
-				// Pentium processors....  Loop time is 43 cycles!
-				dFrequency = (((CLASSICAL_CPU_FREQ_LOOP * 43) / dDifference) / (1024*1024));
-			}
-
-			// Save the clock speed (MHz)
-			Features.CPUSpeed = (s32) dFrequency;
-
-			return true;
-		}
-
-		bool xcpu_info::retrieveCPUExtendedLevelSupport (s32 CPULevelToCheck)
-		{
-			u32 MaxCPUExtendedLevel = 0;
-
-			// The extended CPUID is supported by various vendors starting with the following CPU models: 
-			//
-			//		Manufacturer & Chip Name			|		Family		 Model		Revision
-			//
-			//		AMD K6, K6-2						|		   5		   6			x		
-			//		Cyrix GXm, Cyrix III "Joshua"		|		   5		   4			x
-			//		IDT C6-2							|		   5		   8			x
-			//		VIA Cyrix III						|		   6		   5			x
-			//		Transmeta Crusoe					|		   5		   x			x
-			//		Intel Pentium 4						|		   f		   x			x
-			//
-
-			// We check to see if a supported processor is present...
-			if (ChipManufacturer == AMD) 
-			{
-				if (ChipID.Family < 5) return false;
-				if ((ChipID.Family == 5) && (ChipID.Model < 6)) return false;
-			}
-			else if (ChipManufacturer == Cyrix) 
-			{
-				if (ChipID.Family < 5) return false;
-				if ((ChipID.Family == 5) && (ChipID.Model < 4)) return false;
-				if ((ChipID.Family == 6) && (ChipID.Model < 5)) return false;
-			}
-			else if (ChipManufacturer == IDT)
-			{
-				if (ChipID.Family < 5) return false;
-				if ((ChipID.Family == 5) && (ChipID.Model < 8)) return false;
-			}
-			else if (ChipManufacturer == Transmeta)
-			{
-				if (ChipID.Family < 5) return false;
-			} 
-			else if (ChipManufacturer == Intel)
-			{
-				if (ChipID.Family < 0xf) return false;
-			}
-
-			if (!cpuID(0x80000000, &MaxCPUExtendedLevel, NULL, NULL, NULL))
-				return false;
-
-			// Now we have to check the level wanted vs level returned...
-			s32 nLevelWanted = (CPULevelToCheck & 0x7FFFFFFF);
-			s32 nLevelReturn = (MaxCPUExtendedLevel & 0x7FFFFFFF);
-
-			// Check to see if the level provided is supported...
-			if (nLevelWanted > nLevelReturn) 
-				return false;
-
-			return true;
-		}
-
-		bool xcpu_info::retrieveExtendedCPUFeatures ()
-		{
-			u32 CPUExtendedFeatures = 0;
-
-			// Check that we are not using an Intel processor as it does not support this.
-			if (ChipManufacturer == Intel)
-				return false;
-
-			// Check to see if what we are about to do is supported...
-			if (!retrieveCPUExtendedLevelSupport (0x80000001))
-				return false;
-
-			if (!cpuID(0x80000001, NULL, NULL, NULL, &CPUExtendedFeatures))
-				return false;
-
-			// Retrieve the extended features of CPU present.
-			Features.ExtendedFeatures.Has3DNow =		((CPUExtendedFeatures & 0x80000000) != 0);	// 3DNow Present --> Bit 31.
-			Features.ExtendedFeatures.Has3DNowPlus =	((CPUExtendedFeatures & 0x40000000) != 0);	// 3DNow+ Present -- > Bit 30.
-			Features.ExtendedFeatures.HasSSEMMX =		((CPUExtendedFeatures & 0x00400000) != 0);	// SSE MMX Present --> Bit 22.
-			Features.ExtendedFeatures.SupportsMP =		((CPUExtendedFeatures & 0x00080000) != 0);	// MP Capable -- > Bit 19.
-
-			// Retrieve AMD specific extended features.
-			if (ChipManufacturer == AMD)
-			{
-				Features.ExtendedFeatures.HasMMXPlus =	((CPUExtendedFeatures &	0x00400000) != 0);	// AMD specific: MMX-SSE --> Bit 22
-			}
-
-			// Retrieve Cyrix specific extended features.
-			if (ChipManufacturer == Cyrix) 
-			{
-				Features.ExtendedFeatures.HasMMXPlus =	((CPUExtendedFeatures &	0x01000000) != 0);	// Cyrix specific: Extended MMX --> Bit 24
-			}
-
-			return true;
-		}
-
-		bool xcpu_info::retrieveProcessorSerialNumber ()
-		{
-			u32 SerialNumber[3];
-
-			// Check to see if the processor supports the processor serial number.
-			if (!Features.HasSerial) 
-				return false;
-
-			if (!cpuID(3, NULL, &SerialNumber[0], &SerialNumber[1], &SerialNumber[2]))
-				return false;
-
-			// Process the returned information.
-			x_sprintf (ChipID.SerialNumber, SERIALNUMBER_STRING_LENGTH, "%.2x%.2x-%.2x%.2x-%.2x%.2x-%.2x%.2x-%.2x%.2x-%.2x%.2x",
-				((SerialNumber[0] & 0xff000000) >> 24),
-				((SerialNumber[0] & 0x00ff0000) >> 16),
-				((SerialNumber[0] & 0x0000ff00) >> 8),
-				((SerialNumber[0] & 0x000000ff) >> 0),
-				((SerialNumber[1] & 0xff000000) >> 24),
-				((SerialNumber[1] & 0x00ff0000) >> 16),
-				((SerialNumber[1] & 0x0000ff00) >> 8),
-				((SerialNumber[1] & 0x000000ff) >> 0),
-				((SerialNumber[2] & 0xff000000) >> 24),
-				((SerialNumber[2] & 0x00ff0000) >> 16),
-				((SerialNumber[2] & 0x0000ff00) >> 8),
-				((SerialNumber[2] & 0x000000ff) >> 0));
-
-			return true;
-		}
-
-		bool xcpu_info::retrieveCPUPowerManagement ()
-		{	
-			u32 CPUPowerManagement = 0;
-
-			// Check to see if what we are about to do is supported...
-			if (!retrieveCPUExtendedLevelSupport (0x80000007))
-			{
-				Features.ExtendedFeatures.PowerManagement.HasFrequencyID = false;
-				Features.ExtendedFeatures.PowerManagement.HasVoltageID = false;
-				Features.ExtendedFeatures.PowerManagement.HasTempSenseDiode = false;
-				return false;
-			}
-
-			if (!cpuID(0x80000007, NULL, NULL, NULL, &CPUPowerManagement))
-				return false;
-
-			// Check for the power management capabilities of the CPU.
-			Features.ExtendedFeatures.PowerManagement.HasTempSenseDiode =	((CPUPowerManagement & 0x00000001) != 0);
-			Features.ExtendedFeatures.PowerManagement.HasFrequencyID =		((CPUPowerManagement & 0x00000002) != 0);
-			Features.ExtendedFeatures.PowerManagement.HasVoltageID =		((CPUPowerManagement & 0x00000004) != 0);
-
-			return true;
-		}
-
-		bool xcpu_info::retrieveExtendedCPUIdentity ()
-		{
-			u32 ProcessorNameStartPos = 0;
-			u32 CPUExtendedIdentity[12];
-
-			// Check to see if what we are about to do is supported...
-			if (!retrieveCPUExtendedLevelSupport (0x80000002)) return false;
-			if (!retrieveCPUExtendedLevelSupport (0x80000003)) return false;
-			if (!retrieveCPUExtendedLevelSupport (0x80000004)) return false;
-
-			s32 e = 0;
-			if (!cpuID(0x80000002, &CPUExtendedIdentity[e+0], &CPUExtendedIdentity[e+1], &CPUExtendedIdentity[e+2], &CPUExtendedIdentity[e+3]))
-				return false;
-			e += 4;
-			if (!cpuID(0x80000003, &CPUExtendedIdentity[e+0], &CPUExtendedIdentity[e+1], &CPUExtendedIdentity[e+2], &CPUExtendedIdentity[e+3]))
-				return false;
-			e += 4;
-			if (!cpuID(0x80000004, &CPUExtendedIdentity[e+0], &CPUExtendedIdentity[e+1], &CPUExtendedIdentity[e+2], &CPUExtendedIdentity[e+3]))
-				return false;
-
-			// Process the returned information.
-			x_memcpy (ChipID.ProcessorName, &(CPUExtendedIdentity[0]), sizeof (s32));
-			x_memcpy (&(ChipID.ProcessorName[4]), &(CPUExtendedIdentity[1]), sizeof (s32));
-			x_memcpy (&(ChipID.ProcessorName[8]), &(CPUExtendedIdentity[2]), sizeof (s32));
-			x_memcpy (&(ChipID.ProcessorName[12]), &(CPUExtendedIdentity[3]), sizeof (s32));
-			x_memcpy (&(ChipID.ProcessorName[16]), &(CPUExtendedIdentity[4]), sizeof (s32));
-			x_memcpy (&(ChipID.ProcessorName[20]), &(CPUExtendedIdentity[5]), sizeof (s32));
-			x_memcpy (&(ChipID.ProcessorName[24]), &(CPUExtendedIdentity[6]), sizeof (s32));
-			x_memcpy (&(ChipID.ProcessorName[28]), &(CPUExtendedIdentity[7]), sizeof (s32));
-			x_memcpy (&(ChipID.ProcessorName[32]), &(CPUExtendedIdentity[8]), sizeof (s32));
-			x_memcpy (&(ChipID.ProcessorName[36]), &(CPUExtendedIdentity[9]), sizeof (s32));
-			x_memcpy (&(ChipID.ProcessorName[40]), &(CPUExtendedIdentity[10]), sizeof (s32));
-			x_memcpy (&(ChipID.ProcessorName[44]), &(CPUExtendedIdentity[11]), sizeof (s32));
-			ChipID.ProcessorName[48] = '\0';
-
-			// Because some manufacturers (<cough>Intel</cough>) have leading white space - we have to post-process the name.
-			if (ChipManufacturer == Intel)
-			{
-				for (s32 nCounter = 0; nCounter < CHIPNAME_STRING_LENGTH; nCounter ++)
-				{
-					// There will either be NULL (\0) or spaces ( ) as the leading characters.
-					if ((ChipID.ProcessorName[nCounter] != '\0') && (ChipID.ProcessorName[nCounter] != ' ')) 
-					{
-						// We have found the starting position of the name.
-						ProcessorNameStartPos = nCounter;
-
-						// Terminate the loop.
-						break;
-					}
+				case 1:
+					postfix = "KB ";
+					break;
+				case 2:
+					postfix = "MB ";
+					break;
+				case 3: //unlikely to happen for a long time
+					postfix = "GB ";
+					break;
+				default: postfix = " bytes ";
 				}
 
-				// Check to see if there is any white space at the start.
-				if (ProcessorNameStartPos == 0) 
-					return true;
-
-				// Now move the name forward so that there is no white space.
-				x_memmove (ChipID.ProcessorName, &(ChipID.ProcessorName[ProcessorNameStartPos]), (CHIPNAME_STRING_LENGTH - ProcessorNameStartPos));
-			}
-
-			return true;
-		}
-
-		bool xcpu_info::retrieveClassicalCPUIdentity ()
-		{
-			// Start by decided which manufacturer we are using....
-			switch (ChipManufacturer) 
-			{
-			case Intel:
-				// Check the family / model / revision to determine the CPU ID.
-				switch (ChipID.Family) 
+				std::string type;
+				switch (cache.type)
 				{
+				case 1:
+					type = "Data Cache ";
+					break;
+				case 2:
+					type = "Instruction Cache ";
+					break;
 				case 3:
-					x_sprintf (ChipID.ProcessorName, CHIPNAME_STRING_LENGTH, "Newer i80386 family"); 
+					type = "Unified Cache ";
 					break;
-				case 4:
-					switch (ChipID.Model)
-					{
-					case 0: STORE_CLASSICAL_NAME ("i80486DX-25/33"); break;
-					case 1: STORE_CLASSICAL_NAME ("i80486DX-50"); break;
-					case 2: STORE_CLASSICAL_NAME ("i80486SX"); break;
-					case 3: STORE_CLASSICAL_NAME ("i80486DX2"); break;
-					case 4: STORE_CLASSICAL_NAME ("i80486SL"); break;
-					case 5: STORE_CLASSICAL_NAME ("i80486SX2"); break;
-					case 7: STORE_CLASSICAL_NAME ("i80486DX2 WriteBack"); break;
-					case 8: STORE_CLASSICAL_NAME ("i80486DX4"); break;
-					case 9: STORE_CLASSICAL_NAME ("i80486DX4 WriteBack"); break;
-					default: STORE_CLASSICAL_NAME ("Unknown 80486 family"); return false;
-					}
-					break;
-				case 5:
-					switch (ChipID.Model)
-					{
-					case 0: STORE_CLASSICAL_NAME ("P5 A-Step"); break;
-					case 1: STORE_CLASSICAL_NAME ("P5"); break;
-					case 2: STORE_CLASSICAL_NAME ("P54C"); break;
-					case 3: STORE_CLASSICAL_NAME ("P24T OverDrive"); break;
-					case 4: STORE_CLASSICAL_NAME ("P55C"); break;
-					case 7: STORE_CLASSICAL_NAME ("P54C"); break;
-					case 8: STORE_CLASSICAL_NAME ("P55C (0.25µm)"); break;
-					default: STORE_CLASSICAL_NAME ("Unknown Pentium® family"); return false;
-					}
-					break;
-				case 6:
-					switch (ChipID.Model)
-					{
-					case 0: STORE_CLASSICAL_NAME ("P6 A-Step"); break;
-					case 1: STORE_CLASSICAL_NAME ("P6"); break;
-					case 3: STORE_CLASSICAL_NAME ("Pentium® II (0.28 µm)"); break;
-					case 5: STORE_CLASSICAL_NAME ("Pentium® II (0.25 µm)"); break;
-					case 6: STORE_CLASSICAL_NAME ("Pentium® II With On-Die L2 Cache"); break;
-					case 7: STORE_CLASSICAL_NAME ("Pentium® III (0.25 µm)"); break;
-					case 8: STORE_CLASSICAL_NAME ("Pentium® III (0.18 µm) With 256 KB On-Die L2 Cache "); break;
-					case 0xa: STORE_CLASSICAL_NAME ("Pentium® III (0.18 µm) With 1 Or 2 MB On-Die L2 Cache "); break;
-					case 0xb: STORE_CLASSICAL_NAME ("Pentium® III (0.13 µm) With 256 Or 512 KB On-Die L2 Cache "); break;
-					default: STORE_CLASSICAL_NAME ("Unknown P6 family"); return false;
-					}
-					break;
-				case 7:
-					STORE_CLASSICAL_NAME ("Intel Merced (IA-64)");
-					break;
-				case 0xf:
-					// Check the extended family bits...
-					switch (ChipID.ExtendedFamily)
-					{
-					case 0:
-						switch (ChipID.Model) 
-						{
-						case 0: STORE_CLASSICAL_NAME ("Pentium® IV (0.18 µm)"); break;
-						case 1: STORE_CLASSICAL_NAME ("Pentium® IV (0.18 µm)"); break;
-						case 2: STORE_CLASSICAL_NAME ("Pentium® IV (0.13 µm)"); break;
-						default: STORE_CLASSICAL_NAME ("Unknown Pentium 4 family"); return false;
-						}
-						break;
-					case 1:
-						STORE_CLASSICAL_NAME ("Intel McKinley (IA-64)");
-						break;
-					}
-					break;
-				default:
-					STORE_CLASSICAL_NAME ("Unknown Intel family");
-					return false;
+				default: type = ""; //Error
 				}
-				break;
 
-			case AMD:
-				// Check the family / model / revision to determine the CPU ID.
-				switch (ChipID.Family)
-				{
-				case 4:
-					switch (ChipID.Model) 
-					{
-					case 3: STORE_CLASSICAL_NAME ("80486DX2"); break;
-					case 7: STORE_CLASSICAL_NAME ("80486DX2 WriteBack"); break;
-					case 8: STORE_CLASSICAL_NAME ("80486DX4"); break;
-					case 9: STORE_CLASSICAL_NAME ("80486DX4 WriteBack"); break;
-					case 0xe: STORE_CLASSICAL_NAME ("5x86"); break;
-					case 0xf: STORE_CLASSICAL_NAME ("5x86WB"); break;
-					default: STORE_CLASSICAL_NAME ("Unknown 80486 family"); return false;
-					}
-					break;
-				case 5:
-					switch (ChipID.Model)
-					{
-					case 0: STORE_CLASSICAL_NAME ("SSA5 (PR75, PR90, PR100)"); break;
-					case 1: STORE_CLASSICAL_NAME ("5k86 (PR120, PR133)"); break;
-					case 2: STORE_CLASSICAL_NAME ("5k86 (PR166)"); break;
-					case 3: STORE_CLASSICAL_NAME ("5k86 (PR200)"); break;
-					case 6: STORE_CLASSICAL_NAME ("K6 (0.30 µm)"); break;
-					case 7: STORE_CLASSICAL_NAME ("K6 (0.25 µm)"); break;
-					case 8: STORE_CLASSICAL_NAME ("K6-2"); break;
-					case 9: STORE_CLASSICAL_NAME ("K6-III"); break;
-					case 0xd: STORE_CLASSICAL_NAME ("K6-2+ or K6-III+ (0.18 µm)"); break;
-					default: STORE_CLASSICAL_NAME ("Unknown 80586 family"); return false;
-					}
-					break;
-				case 6:
-					switch (ChipID.Model)
-					{
-					case 1: STORE_CLASSICAL_NAME ("Athlon™ (0.25 µm)"); break;
-					case 2: STORE_CLASSICAL_NAME ("Athlon™ (0.18 µm)"); break;
-					case 3: STORE_CLASSICAL_NAME ("Duron™ (SF core)"); break;
-					case 4: STORE_CLASSICAL_NAME ("Athlon™ (Thunderbird core)"); break;
-					case 6: STORE_CLASSICAL_NAME ("Athlon™ (Palomino core)"); break;
-					case 7: STORE_CLASSICAL_NAME ("Duron™ (Morgan core)"); break;
-					case 8: 
-						if (Features.ExtendedFeatures.SupportsMP)
-							STORE_CLASSICAL_NAME ("Athlon™ MP (Thoroughbred core)"); 
-						else STORE_CLASSICAL_NAME ("Athlon™ XP (Thoroughbred core)");
-						break;
-					default: STORE_CLASSICAL_NAME ("Unknown K7 family"); return false;
-					}
-					break;
-				default:
-					STORE_CLASSICAL_NAME ("Unknown AMD family");
-					return false;
-				}
-				break;
+				cacheDescription += (cache.type < 3 ? std::to_string(numCores) + "x " : "") + "L" + std::to_string(cache.level) + " " + type
+					+ std::to_string(cache.CacheSize) + postfix + (cache.FullyAssoc ? " Fully-Associative" : std::to_string(cache.lineAssociativity) + "-Way\n");
 
-			case Transmeta:
-				switch (ChipID.Family)
-				{	
-				case 5:
-					switch (ChipID.Model) 
-					{
-					case 4: STORE_CLASSICAL_NAME ("Crusoe TM3x00 and TM5x00"); break;
-					default: STORE_CLASSICAL_NAME ("Unknown Crusoe family"); return false;
-					}
-					break;
-				default:
-					STORE_CLASSICAL_NAME ("Unknown Transmeta family");
-					return false;
-				}
-				break;
-
-			case Rise:
-				switch (ChipID.Family)
-				{	
-				case 5:
-					switch (ChipID.Model) 
-					{
-					case 0: STORE_CLASSICAL_NAME ("mP6 (0.25 µm)"); break;
-					case 2: STORE_CLASSICAL_NAME ("mP6 (0.18 µm)"); break;
-					default: STORE_CLASSICAL_NAME ("Unknown Rise family"); return false;
-					}
-					break;
-				default:
-					STORE_CLASSICAL_NAME ("Unknown Rise family");
-					return false;
-				}
-				break;
-
-			case UMC:
-				switch (ChipID.Family) 
-				{	
-				case 4:
-					switch (ChipID.Model) 
-					{
-					case 1: STORE_CLASSICAL_NAME ("U5D"); break;
-					case 2: STORE_CLASSICAL_NAME ("U5S"); break;
-					default: STORE_CLASSICAL_NAME ("Unknown UMC family"); return false;
-					}
-					break;
-				default:
-					STORE_CLASSICAL_NAME ("Unknown UMC family");
-					return false;
-				}
-				break;
-
-			case IDT:
-				switch (ChipID.Family)
-				{	
-				case 5:
-					switch (ChipID.Model) 
-					{
-					case 4: STORE_CLASSICAL_NAME ("C6"); break;
-					case 8: STORE_CLASSICAL_NAME ("C2"); break;
-					case 9: STORE_CLASSICAL_NAME ("C3"); break;
-					default: STORE_CLASSICAL_NAME ("Unknown IDT\\Centaur family"); return false;
-					}
-					break;
-				case 6:
-					switch (ChipID.Model)
-					{
-					case 6: STORE_CLASSICAL_NAME ("VIA Cyrix III - Samuel"); break;
-					default: STORE_CLASSICAL_NAME ("Unknown IDT\\Centaur family"); return false;
-					}
-					break;
-				default:
-					STORE_CLASSICAL_NAME ("Unknown IDT\\Centaur family");
-					return false;
-				}
-				break;
-
-			case Cyrix:
-				switch (ChipID.Family)
-				{	
-				case 4:
-					switch (ChipID.Model)
-					{
-					case 4: STORE_CLASSICAL_NAME ("MediaGX GX, GXm"); break;
-					case 9: STORE_CLASSICAL_NAME ("5x86"); break;
-					default: STORE_CLASSICAL_NAME ("Unknown Cx5x86 family"); return false;
-					}
-					break;
-				case 5:
-					switch (ChipID.Model)
-					{
-					case 2: STORE_CLASSICAL_NAME ("Cx6x86"); break;
-					case 4: STORE_CLASSICAL_NAME ("MediaGX GXm"); break;
-					default: STORE_CLASSICAL_NAME ("Unknown Cx6x86 family"); return false;
-					}
-					break;
-				case 6:
-					switch (ChipID.Model)
-					{
-					case 0: STORE_CLASSICAL_NAME ("6x86MX"); break;
-					case 5: STORE_CLASSICAL_NAME ("Cyrix M2 Core"); break;
-					case 6: STORE_CLASSICAL_NAME ("WinChip C5A Core"); break;
-					case 7: STORE_CLASSICAL_NAME ("WinChip C5B\\C5C Core"); break;
-					case 8: STORE_CLASSICAL_NAME ("WinChip C5C-T Core"); break;
-					default: STORE_CLASSICAL_NAME ("Unknown 6x86MX\\Cyrix III family"); return false;
-					}
-					break;
-				default:
-					STORE_CLASSICAL_NAME ("Unknown Cyrix family");
-					return false;
-				}
-				break;
-
-			case NexGen:
-				switch (ChipID.Family)
-				{	
-				case 5:
-					switch (ChipID.Model)
-					{
-					case 0: STORE_CLASSICAL_NAME ("Nx586 or Nx586FPU"); break;
-					default: STORE_CLASSICAL_NAME ("Unknown NexGen family"); return false;
-					}
-					break;
-				default:
-					STORE_CLASSICAL_NAME ("Unknown NexGen family");
-					return false;
-				}
-				break;
-
-			case NSC:
-				STORE_CLASSICAL_NAME ("Cx486SLC \\ DLC \\ Cx486S A-Step");
-				break;
-
-			default:
-				// We cannot identify the processor.
-				STORE_CLASSICAL_NAME ("Unknown family");
-				return false;
+				count++;
 			}
-
-			return true;
+			return cacheDescription;
 		}
-
-		bool xcpu_info::doesCPUSupportCPUID ()
-		{
-			s32 CPUIDPresent = 0;
-
-			if (!cpuID(0, NULL, NULL, NULL, NULL))
-				CPUIDPresent = 1;
-
-#ifdef USE_RIGHT_CPUID_DETECTION
-			// The "right" way, which doesn't work under certain Windows versions
-			CPU_INFO_TRY 
-			{
-				_asm
-				{
-					pushfd                      ; save EFLAGS to stack.
-					pop     eax                 ; store EFLAGS in eax.
-					mov     edx, eax            ; save in ebx for testing later.
-					xor     eax, 0200000h       ; switch bit 21.
-					push    eax                 ; copy "changed" value to stack.
-					popfd                       ; save "changed" eax to EFLAGS.
-					pushfd
-					pop     eax
-					xor     eax, edx            ; See if bit changeable.
-					jnz     short cpuid_present ; if so, mark 
-					mov     eax, -1             ; CPUID not present - disable its usage
-					jmp     no_features
-
-cpuid_present:
-					mov		eax, 0				; CPUID capable CPU - enable its usage.
-
-no_features:
-					mov     CPUIDPresent, eax	; Save the value in eax to a variable.
-				}
-			}
-
-			// A generic catch-all just to be sure...
-			CPU_INFO_CATCH_ALL 
-			{
-				// Stop the class from trying to use CPUID again!
-				CPUIDPresent = false;
-				return false;
-			}
-
-#endif
-
-			// Return true to indicate support or false to indicate lack.
-			return (CPUIDPresent == 0) ? true : false;
-		}
-
-		// --------------------------------------------------------
-		//
-		//         Constructor Functions - CPUSpeed Class
-		//
-		// --------------------------------------------------------
-#define RDTSC_INSTRUCTION			_asm _emit 0x0f _asm _emit 0x31
-#define	CPUSPEED_I32TO64(x, y)		(((s64) x << 32) + y)
-
-		static s64 getCyclesDifference (DELAY_FUNC DelayFunction, u32 uiParameter)
-		{
-			u32 edx1, eax1;
-			u32 edx2, eax2;
-
-			// Calculate the frequency of the CPU instructions.
-			CPU_INFO_TRY 
-			{
-				_asm
-				{
-					push uiParameter		; push parameter param
-					mov ebx, DelayFunction	; store func in ebx
-
-					RDTSC_INSTRUCTION
-
-					mov esi, eax			; esi = eax
-					mov edi, edx			; edi = edx
-
-					call ebx				; call the delay functions
-
-					RDTSC_INSTRUCTION
-
-					pop ebx
-
-					mov edx2, edx			; edx2 = edx
-					mov eax2, eax			; eax2 = eax
-
-					mov edx1, edi			; edx2 = edi
-					mov eax1, esi			; eax2 = esi
-				}
-			}
-
-			// A generic catch-all just to be sure...
-			CPU_INFO_CATCH_ALL
-			{
-				return -1;
-			}
-
-			return (CPUSPEED_I32TO64 (edx2, eax2) - CPUSPEED_I32TO64 (edx1, eax1));
-		}
-
-
-		static void cpuSpeed_Delay (u32 uiMS)
-		{
-			LARGE_INTEGER Frequency, StartCounter, EndCounter;
-			s64 x;
-
-			// Get the frequency of the high performance counter.
-			if (!QueryPerformanceFrequency (&Frequency)) 
-				return;
-
-			x = Frequency.QuadPart / 1000 * uiMS;
-
-			// Get the starting position of the counter.
-			QueryPerformanceCounter (&StartCounter);
-
-			do
-			{
-				// Get the ending position of the counter.	
-				QueryPerformanceCounter (&EndCounter);
-			} while (EndCounter.QuadPart - StartCounter.QuadPart < x);
-		}
-
-		static void cpuSpeed_DelayOverhead (u32 uiMS)
-		{
-			LARGE_INTEGER Frequency, StartCounter, EndCounter;
-			s64 x;
-
-			// Get the frequency of the high performance counter.
-			if (!QueryPerformanceFrequency (&Frequency))
-				return;
-
-			x = Frequency.QuadPart / 1000 * uiMS;
-
-			// Get the starting position of the counter.
-			QueryPerformanceCounter (&StartCounter);
-
-			do
-			{
-				// Get the ending position of the counter.	
-				QueryPerformanceCounter (&EndCounter);
-			} while (EndCounter.QuadPart - StartCounter.QuadPart == x);
-		}
-
-		u64 xcpu_info::getCPUSpeedInkHz() const
-		{
-			return mCPUSpeedInkHz;
-		}
-
-		u64 xcpu_info::getCPUSpeedInMHz() const
-		{
-			return mCPUSpeedInkHz / 1000;
-		}
-
-
-		// --------------------------------------------------------
-		//
-		//         Public Functions - xinfo Class
-		//
-		// --------------------------------------------------------
-
-		const char* xcpu_info::getVendorString () const
-		{
-			// Return the vendor string.
-			return ChipID.Vendor;
-		}
-
-		const char* xcpu_info::getVendorID () const
-		{
-			// Return the vendor ID.
-			switch (ChipManufacturer)
-			{
-			case Intel:
-				return "Intel Corporation";
-			case AMD:
-				return "Advanced Micro Devices";
-			case NSC:
-				return "National Semiconductor";
-			case Cyrix:
-				return "Cyrix Corp., VIA Inc.";
-			case NexGen:
-				return "NexGen Inc., Advanced Micro Devices";
-			case IDT:
-				return "IDT\\Centaur, Via Inc.";
-			case UMC:
-				return "United Microelectronics Corp.";
-			case Rise:
-				return "Rise";
-			case Transmeta:
-				return "Transmeta";
-			default:
-				return "Unknown Manufacturer";
-			}
-		}
-
-		const char * xcpu_info::getTypeID () const
-		{
-			// Return the type ID of the CPU.
-			static char szTypeID[6] = { '\0' };
-			if (szTypeID[0] == '\0')
-				x_dtoa (ChipID.Type, szTypeID, sizeof(szTypeID), 10);
-			return szTypeID;
-		}
-
-		const char * xcpu_info::getFamilyID () const
-		{
-			// Return the family of the CPU present.
-			static char szFamilyID[6] = { '\0' };
-			if (szFamilyID[0] == '\0')
-				x_dtoa (ChipID.Family, szFamilyID, sizeof(szFamilyID), 10);
-			return szFamilyID;
-		}
-
-		const char * xcpu_info::getModelID () const
-		{
-			// Return the model of CPU present.
-			static char szModelID[6] = { '\0' };
-			if (szModelID[0] == '\0')
-				x_dtoa (ChipID.Model, szModelID, sizeof(szModelID), 10);
-			return szModelID;
-		}
-
-		const char * xcpu_info::getSteppingCode () const
-		{
-			// Return the stepping code of the CPU present.
-			static char szSteppingCode[6] = { '\0' };
-			if (szSteppingCode[0] == '\0')
-				x_dtoa (ChipID.Revision, szSteppingCode, sizeof(szSteppingCode), 10);
-			return szSteppingCode;
-		}
-
-		const char * xcpu_info::getExtendedProcessorName () const
-		{
-			// Return the stepping code of the CPU present.
-			return ChipID.ProcessorName;
-		}
-
-		const char * xcpu_info::getProcessorSerialNumber () const
-		{
-			// Return the serial number of the processor in hexadecimal: xxxx-xxxx-xxxx-xxxx-xxxx-xxxx.
-			return ChipID.SerialNumber;
-		}
-
-		s32 xcpu_info::getPhysicalProcessors () const
-		{
-			// Return the physical processors count
-			return Features.ExtendedFeatures.NumCores;
-		}
-
-		s32 xcpu_info::getLogicalProcessorsPerPhysical () const
-		{
-			// Return the logical processors per physical.
-			return Features.ExtendedFeatures.LogicalProcessorsPerPhysical;
-		}
-
-		u64 xcpu_info::getProcessorClockFrequency () const
-		{
-			// Return the processor clock frequency.
-			u64 s = getCPUSpeedInMHz();
-			if (s == 0)
-				return -1;
-			return s;
-		}
-
-		s32 xcpu_info::getProcessorAPICID () const
-		{
-			// Return the APIC ID.
-			return Features.ExtendedFeatures.APIC_ID;
-		}
-
-				// define cpu related macros
-		#define L1CACHE_FEATURE				0x00008000
-		#define L2CACHE_FEATURE				0x00010000
-		#define L3CACHE_FEATURE				0x00020000
-
-		#if defined(TARGET_PC)
-		#define MMX_FEATURE					0x00000001
-		#define MMX_PLUS_FEATURE			0x00000002
-		#define SSE_FEATURE					0x00000004
-		#define SSE2_FEATURE				0x00000008
-		#define AMD_3DNOW_FEATURE			0x00000010
-		#define AMD_3DNOW_PLUS_FEATURE		0x00000020
-		#define IA64_FEATURE				0x00000040
-		#define MP_CAPABLE					0x00000080
-		#define HYPERTHREAD_FEATURE			0x00000100
-		#define SERIALNUMBER_FEATURE		0x00000200
-		#define APIC_FEATURE				0x00000400
-		#define SSE_FP_FEATURE				0x00000800
-		#define SSE_MMX_FEATURE				0x00001000
-		#define CMOV_FEATURE				0x00002000
-		#define MTRR_FEATURE				0x00004000
-		#define ACPI_FEATURE				0x00040000
-		#define THERMALMONITOR_FEATURE		0x00080000
-		#define TEMPSENSEDIODE_FEATURE		0x00100000
-		#define FREQUENCYID_FEATURE			0x00200000
-		#define VOLTAGEID_FREQUENCY			0x00400000
-		#elif defined(TARGET_PS3)
-		#elif defined(TARGET_PSP)
-		#elif defined(TARGET_WII)
-		#elif defined(TARGET_3DS)
-		#elif defined(TARGET_360)
-		#endif
-		//end of define
-
-		s32 xcpu_info::getProcessorCacheXSize (u32 dwCacheID) const
-		{
-			// Return the chosen cache size.
-			switch (dwCacheID) 
-			{
-			case L1CACHE_FEATURE:
-				return Features.L1CacheSize;
-
-			case L2CACHE_FEATURE:
-				return Features.L2CacheSize;
-
-			case L3CACHE_FEATURE:
-				return Features.L3CacheSize;
-			}
-
-			// The user did something strange just return and error.
-			return -1;
-		}
-
-		bool xcpu_info::doesCPUSupportFeature (u32 dwFeature) const
-		{
-			bool bHasFeature = false;
-
-			// Check for MMX instructions.
-			if (((dwFeature & MMX_FEATURE) != 0) && Features.HasMMX) bHasFeature = true;
-
-			// Check for MMX+ instructions.
-			if (((dwFeature & MMX_PLUS_FEATURE) != 0) && Features.ExtendedFeatures.HasMMXPlus) bHasFeature = true;
-
-			// Check for SSE FP instructions.
-			if (((dwFeature & SSE_FEATURE) != 0) && Features.HasSSE) bHasFeature = true;
-
-			// Check for SSE FP instructions.
-			if (((dwFeature & SSE_FP_FEATURE) != 0) && Features.HasSSEFP) bHasFeature = true;
-
-			// Check for SSE MMX instructions.
-			if (((dwFeature & SSE_MMX_FEATURE) != 0) && Features.ExtendedFeatures.HasSSEMMX) bHasFeature = true;
-
-			// Check for SSE2 instructions.
-			if (((dwFeature & SSE2_FEATURE) != 0) && Features.HasSSE2) bHasFeature = true;
-
-			// Check for 3DNow! instructions.
-			if (((dwFeature & AMD_3DNOW_FEATURE) != 0) && Features.ExtendedFeatures.Has3DNow) bHasFeature = true;
-
-			// Check for 3DNow+ instructions.
-			if (((dwFeature & AMD_3DNOW_PLUS_FEATURE) != 0) && Features.ExtendedFeatures.Has3DNowPlus) bHasFeature = true;
-
-			// Check for IA64 instructions.
-			if (((dwFeature & IA64_FEATURE) != 0) && Features.HasIA64) bHasFeature = true;
-
-			// Check for MP capable.
-			if (((dwFeature & MP_CAPABLE) != 0) && Features.ExtendedFeatures.SupportsMP) bHasFeature = true;
-
-			// Check for a serial number for the processor.
-			if (((dwFeature & SERIALNUMBER_FEATURE) != 0) && Features.HasSerial) bHasFeature = true;
-
-			// Check for a local APIC in the processor.
-			if (((dwFeature & APIC_FEATURE) != 0) && Features.HasAPIC) bHasFeature = true;
-
-			// Check for CMOV instructions.
-			if (((dwFeature & CMOV_FEATURE) != 0) && Features.HasCMOV) bHasFeature = true;
-
-			// Check for MTRR instructions.
-			if (((dwFeature & MTRR_FEATURE) != 0) && Features.HasMTRR) bHasFeature = true;
-
-			// Check for L1 cache size.
-			if (((dwFeature & L1CACHE_FEATURE) != 0) && (Features.L1CacheSize != -1)) bHasFeature = true;
-
-			// Check for L2 cache size.
-			if (((dwFeature & L2CACHE_FEATURE) != 0) && (Features.L2CacheSize != -1)) bHasFeature = true;
-
-			// Check for L3 cache size.
-			if (((dwFeature & L3CACHE_FEATURE) != 0) && (Features.L3CacheSize != -1)) bHasFeature = true;
-
-			// Check for ACPI capability.
-			if (((dwFeature & ACPI_FEATURE) != 0) && Features.HasACPI) bHasFeature = true;
-
-			// Check for thermal monitor support.
-			if (((dwFeature & THERMALMONITOR_FEATURE) != 0) && Features.HasThermal) bHasFeature = true;
-
-			// Check for temperature sensing diode support.
-			if (((dwFeature & TEMPSENSEDIODE_FEATURE) != 0) && Features.ExtendedFeatures.PowerManagement.HasTempSenseDiode) bHasFeature = true;
-
-			// Check for frequency ID support.
-			if (((dwFeature & FREQUENCYID_FEATURE) != 0) && Features.ExtendedFeatures.PowerManagement.HasFrequencyID) bHasFeature = true;
-
-			// Check for voltage ID support.
-			if (((dwFeature & VOLTAGEID_FREQUENCY) != 0) && Features.ExtendedFeatures.PowerManagement.HasVoltageID) bHasFeature = true;
-
-			return bHasFeature;
-		}
-	};
-
-	//---------------------------------------------------------------------------------------------------------------------
-	class xicpu_info
-	{
-	public:
-		s32				getPhysicalProcessors () const;
-		s32				getLogicalProcessorsPerPhysical () const;
-		u64				getProcessorClockFrequency () const;
-
-	private:
-		xcpu_info_win32::xcpu_info	Info;
-	};
-
-	s32				xicpu_info::getPhysicalProcessors () const
-	{
-		return Info.getPhysicalProcessors();
 	}
-
-	//---------------------------------------------------------------------------------------------------------------------
-
-
-	s32				xicpu_info::getLogicalProcessorsPerPhysical () const
-	{
-		return Info.getLogicalProcessorsPerPhysical();
-	}
-
-
-	//---------------------------------------------------------------------------------------------------------------------
-
-	u64				xicpu_info::getProcessorClockFrequency () const
-	{
-		return Info.getProcessorClockFrequency();
-	}
-
 	//---------------------------------------------------------------------------------------------------------------------
 
 	void			xcpu_info::initialize()
 	{
-		// TODO: Should be heap allocation here
-		static xicpu_info sInfo;
-		mCpuInfo = &sInfo;
 	}
 
-	void			xcpu_info::print()
+	s32				xcpu_info::getPhysicalProcessors ()
 	{
-		// TODO: implement
+		return std::thread::hardware_concurrency();
 	}
 
-	u64				xcpu_info::getCPUSpeedInkHz() const
+	s32				xcpu_info::getLogicalProcessorsPerPhysical ()
 	{
-		return mCpuInfo->getProcessorClockFrequency() * 1000;
-	}
-
-	u64				xcpu_info::getCPUSpeedInMHz() const
-	{
-		return mCpuInfo->getProcessorClockFrequency();
-	}
-
-	s32				xcpu_info::getPhysicalProcessors () const
-	{
-		return mCpuInfo->getPhysicalProcessors();
-	}
-
-	s32				xcpu_info::getLogicalProcessorsPerPhysical () const
-	{
-		return mCpuInfo->getLogicalProcessorsPerPhysical();
+		return 1;
 	}
 
 	//==============================================================================

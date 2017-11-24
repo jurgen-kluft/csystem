@@ -1,10 +1,17 @@
-#include "xbase/x_target.h"
+#include "xbase/x_base.h"
+#include "xbase/x_allocator.h"
 
-#ifdef TARGET_PC
+#if defined(TARGET_PC)
 
 //==============================================================================
 // INCLUDES
 //==============================================================================
+#include "xbase/x_debug.h"
+#include "xbase/x_string_ascii.h"
+#include "xbase/x_memory_std.h"
+
+#include "xsystem/x_system.h"
+
 #define WIN32_LEAN_AND_MEAN
 #define NOGDI
 #define NOMB
@@ -21,11 +28,11 @@
 #include <Assert.h>
 #include <Dbghelp.h>
 
-#include "xbase/x_debug.h"
-#include "xbase/x_string_ascii.h"
-#include "xbase/x_memory_std.h"
+#include <Iphlpapi.h>
+#pragma comment(lib, "iphlpapi.lib")
+#pragma comment(lib, "DbgHelp.lib")
 
-#include "xsystem/x_system.h"
+#include "xbase/x_integer.h"
 
 
 //==============================================================================
@@ -35,42 +42,6 @@ namespace xcore
 {
 	namespace xsystem
 	{
-		ESystemFlags		ParseSystemFlags(ESystemFlags systemflags, int argc, const char** argv)
-		{
-			bool data_from_dvd = false;
-			bool mem_32mb   = false;
-			bool mem_64mb   = false;
-			bool mem_128mb  = false;
-			bool mem_256mb  = false;
-			bool mem_512mb  = false;
-			bool mem_1024mb = false;
-			bool stack_512kb = false;
-			bool dev = false;
-			for (s32 i=0; i<argc; ++i)
-			{
-				data_from_dvd = data_from_dvd | (x_strcmp(argv[i], "-host")==0);
-				mem_32mb    = mem_32mb    | (x_strcmp(argv[i], "-mem32")==0);
-				mem_64mb    = mem_64mb    | (x_strcmp(argv[i], "-mem64")==0);
-				mem_128mb   = mem_128mb   | (x_strcmp(argv[i], "-mem128")==0);
-				mem_256mb   = mem_256mb   | (x_strcmp(argv[i], "-mem256")==0);
-				mem_512mb   = mem_512mb   | (x_strcmp(argv[i], "-mem512")==0);
-				mem_1024mb  = mem_1024mb  | (x_strcmp(argv[i], "-mem1024")==0);
-				stack_512kb = stack_512kb | (x_strcmp(argv[i], "-stack512")==0);
-				dev         = dev         | (x_strcmp(argv[i], "-dev")==0);
-			}
-
-			systemflags = dev           ? SetSystemFlag(systemflags, xcore::xsystem::MODE_MASK     , xcore::xsystem::MODE_DEV       ) : systemflags;
-			systemflags = data_from_dvd ? SetSystemFlag(systemflags, xcore::xsystem::DATA_FROM_MASK, xcore::xsystem::DATA_FROM_DVD  ) : systemflags;
-			systemflags = mem_32mb      ? SetSystemFlag(systemflags, xcore::xsystem::MEM_MASK      , xcore::xsystem::MEM_32MB       ) : systemflags;
-			systemflags = mem_64mb      ? SetSystemFlag(systemflags, xcore::xsystem::MEM_MASK      , xcore::xsystem::MEM_64MB       ) : systemflags;
-			systemflags = mem_128mb     ? SetSystemFlag(systemflags, xcore::xsystem::MEM_MASK      , xcore::xsystem::MEM_128MB      ) : systemflags;
-			systemflags = mem_256mb     ? SetSystemFlag(systemflags, xcore::xsystem::MEM_MASK      , xcore::xsystem::MEM_256MB      ) : systemflags;
-			systemflags = mem_512mb     ? SetSystemFlag(systemflags, xcore::xsystem::MEM_MASK      , xcore::xsystem::MEM_512MB      ) : systemflags;
-			systemflags = mem_1024mb    ? SetSystemFlag(systemflags, xcore::xsystem::MEM_MASK      , xcore::xsystem::MEM_1024MB     ) : systemflags;
-			systemflags = stack_512kb   ? SetSystemFlag(systemflags, xcore::xsystem::MEM_STACK_MASK, xcore::xsystem::MEM_512KB_STACK) : systemflags;
-
-			return systemflags;
-		}
 
 		enum ESystemPC
 		{
@@ -78,35 +49,63 @@ namespace xcore
 			MAX_STACK_NAME_LEN = 1024
 		};
 
-		static char							m_szExePath[MAX_EXE_PATH];
+		struct xctxt
+		{
+			xctxt(x_iallocator* a)
+				: m_allocator(a)
+				, m_uMemHeapTotalSize(16ULL * 1024 * 1024 * 1024)
+				, m_uLanguage(LANGUAGE_ENGLISH)
+				, m_console_type(CONSOLE_DESKTOP)
+				, m_media_type(MEDIA_HDD)
+				, m_codeSegmentSize(0)
+				, m_bssSegmentSize(0)
+				, m_dataSegmentSize(0)
+				, m_imageSize(0)
+				, m_mainThreadStackSize(0)
+				, m_pContext(NULL)
+			{
+			}
 
-		static bool							s_bGrowMemory						= true;
-		static u32							s_uMemHeapTotalSize					= 0;
-		static void*						s_pMemHeapBase						= NULL;
-		static ELanguage					m_uLanguage							= LANGUAGE_ENGLISH;
+			x_iallocator*					m_allocator;
+			char							m_szAppTitle[128];
+			char							m_szExePath[MAX_EXE_PATH];
+			char							m_szNickName[128];
+			u64								m_uMemHeapTotalSize;
+			ELanguage						m_uLanguage;
+			LPTOP_LEVEL_EXCEPTION_FILTER	m_pPreviousFilter;
 
-		static LPTOP_LEVEL_EXCEPTION_FILTER	m_pPreviousFilter;
+			EConsoleType					m_console_type;
+			EMediaType						m_media_type;
+
+			s32								m_codeSegmentSize;
+			s32								m_bssSegmentSize;
+			s32								m_dataSegmentSize;
+			s32								m_imageSize;
+			u64								m_mainThreadStackSize;
+			
+			CONTEXT							m_xContext;
+			CONTEXT*						m_pContext;
+
+			XCORE_CLASS_PLACEMENT_NEW_DELETE
+		};
+		static xctxt*						sCtxt = NULL;
+
+		static void							InitializeExecutableInfo(xctxt* c);
+		static void							GenerateExceptionReport(xctxt* c, PEXCEPTION_POINTERS pExceptionInfo);
+		static LONG WINAPI					UnhandledExceptionFilter(xctxt* c, PEXCEPTION_POINTERS pExceptionInfo);
 
 		static char*						GetExceptionString			( DWORD dwCode );
 		static BOOL							GetLogicalAddress			( PVOID addr, PTSTR szModule, DWORD len, DWORD& section, DWORD& offset );
 
 		static BOOL CALLBACK				ReadProcessMemoryProc64		( HANDLE hProcess, DWORD64 lpBaseAddress, PVOID lpBuffer, DWORD nSize, LPDWORD lpNumberOfBytesRead );
 
-		static void							GenerateExceptionReport		( PEXCEPTION_POINTERS pExceptionInfo );
-		static LONG WINAPI					UnhandledExceptionFilter	( PEXCEPTION_POINTERS pExceptionInfo );
 
 		//==============================================================================
 		//Executable info
 		//==============================================================================
 
-		static s32	codeSegmentSize;
-		static s32	bssSegmentSize;
-		static s32	dataSegmentSize;
-		static s32	imageSize;
-		static s32	mainThreadStackSize;
-
 		//---------------------------------------------------------------------------------------------------------------------
-		void InitializeExecutableInfo()
+		void InitializeExecutableInfo(xctxt* c)
 		{
 			HMODULE hModule = 0;
 
@@ -119,67 +118,78 @@ namespace xcore
 				return;
 			}
 
-			::GetModuleFileNameExA(GetCurrentProcess(), hModule, m_szExePath, sizeof(m_szExePath));
+			::GetModuleFileNameExA(GetCurrentProcess(), hModule, c->m_szExePath, sizeof(c->m_szExePath));
 
-			DWORD hMod = (DWORD)mbi.AllocationBase;
+			PVOID hMod = (PVOID)mbi.AllocationBase;
 
 			if (0 != hMod)
 			{
 				PIMAGE_DOS_HEADER pDosHdr = (PIMAGE_DOS_HEADER)hMod;
-				PIMAGE_NT_HEADERS pNtHdr = (PIMAGE_NT_HEADERS)(hMod + pDosHdr->e_lfanew);
+				PIMAGE_NT_HEADERS pNtHdr = (PIMAGE_NT_HEADERS)((u8*)hMod + pDosHdr->e_lfanew);
 
+#ifdef TARGET_32BIT
 				PIMAGE_OPTIONAL_HEADER32 pOptionalHdr = &pNtHdr->OptionalHeader;
+#else
+				PIMAGE_OPTIONAL_HEADER64 pOptionalHdr = &pNtHdr->OptionalHeader;
+#endif
 
-				codeSegmentSize		=	pOptionalHdr->SizeOfCode;
-				bssSegmentSize		=	pOptionalHdr->SizeOfUninitializedData;
-				dataSegmentSize		=	pOptionalHdr->SizeOfInitializedData;
-				imageSize			=	pOptionalHdr->SizeOfImage;
-				mainThreadStackSize	=	pOptionalHdr->SizeOfStackReserve;
-
+				c->m_codeSegmentSize		=	pOptionalHdr->SizeOfCode;
+				c->m_bssSegmentSize		=	pOptionalHdr->SizeOfUninitializedData;
+				c->m_dataSegmentSize		=	pOptionalHdr->SizeOfInitializedData;
+				c->m_imageSize			=	pOptionalHdr->SizeOfImage;
+				c->m_mainThreadStackSize	=	pOptionalHdr->SizeOfStackReserve;
 			}
-
 		}
 
 
 		//---------------------------------------------------------------------------------------------------------------------
-		s32	GetCodeSegmentSize()
+		u64	getCodeSegmentSize(xctxt* c)
 		{
-			return codeSegmentSize;
+			return c->m_codeSegmentSize;
 		}
 
 		//---------------------------------------------------------------------------------------------------------------------
 
-		s32	GetBssSegmentSize()
+		u64	getBssSegmentSize(xctxt* c)
 		{
-			return bssSegmentSize;
+			return c->m_bssSegmentSize;
 		}
 
 		//---------------------------------------------------------------------------------------------------------------------
 
-		s32	GetDataSegmentSize()
+		u64	getDataSegmentSize(xctxt* c)
 		{
-			return dataSegmentSize;
+			return c->m_dataSegmentSize;
 		}
 
 		//---------------------------------------------------------------------------------------------------------------------
 
-		s32	GetMainThreadStackSize()
+		u64	getMainThreadStackSize(xctxt* c)
 		{
-			return mainThreadStackSize;
+			return c->m_mainThreadStackSize;
 		}
 
 		//---------------------------------------------------------------------------------------------------------------------
 
-		const char* GetExePath()
+		const char*				getExePath(xctxt* c)
 		{
-			return m_szExePath;
+			return c->m_szExePath;
 		}
 
+		const char*				getNickname(xctxt* c)
+		{
+			return c->m_szNickName;
+		}
 
+		void					setGameTitle(xctxt* c, const char* title)
+		{
+			ascii::copy(c->m_szAppTitle, c->m_szAppTitle + sizeof(c->m_szAppTitle) - 1, title, NULL);
+		}
 
-
-
-
+		const char*				getGameTitle(xctxt* c)
+		{
+			return c->m_szAppTitle;
+		}
 
 
 		//----------------
@@ -226,7 +236,7 @@ namespace xcore
 
 		#undef CASE_EXCEPTION
 
-		BOOL GetLogicalAddress( PVOID addr, PTSTR szModule, DWORD len, DWORD& section, DWORD& offset )
+		BOOL GetLogicalAddress( PVOID addr, PTSTR szModule, DWORD len, DWORD& section, u64& offset )
 		{
 			MEMORY_BASIC_INFORMATION mbi;
 
@@ -235,7 +245,7 @@ namespace xcore
 				return FALSE;
 			}
 
-			DWORD hMod = (DWORD)mbi.AllocationBase;
+			PVOID hMod = (PVOID)mbi.AllocationBase;
 
 			if ( !GetModuleFileName( (HMODULE)hMod, szModule, len ) )
 			{
@@ -246,11 +256,11 @@ namespace xcore
 			PIMAGE_DOS_HEADER pDosHdr = (PIMAGE_DOS_HEADER)hMod;
 
 			// From the DOS header, find the NT (PE) header
-			PIMAGE_NT_HEADERS pNtHdr = (PIMAGE_NT_HEADERS)(hMod + pDosHdr->e_lfanew);
+			PIMAGE_NT_HEADERS pNtHdr = (PIMAGE_NT_HEADERS)((u8*)hMod + pDosHdr->e_lfanew);
 
 			PIMAGE_SECTION_HEADER pSection = IMAGE_FIRST_SECTION( pNtHdr );
 
-			DWORD rva = (DWORD)addr - hMod; // RVA is offset from module load address
+			u64 rva = ((u8*)addr - (u8*)hMod); // RVA is offset from module load address
 
 			// Iterate through the section table, looking for the one that encompasses
 			// the linear address.
@@ -281,7 +291,7 @@ namespace xcore
 
 			if(boOK)
 			{
-				*lpNumberOfBytesRead	= xRead;
+				*lpNumberOfBytesRead	= (DWORD)xRead;
 			}
 
 			return boOK;
@@ -289,6 +299,7 @@ namespace xcore
 
 		void GenerateExceptionReport( PEXCEPTION_POINTERS pExceptionInfo )
 		{
+#if 0
 			// Start out with a banner
 			xconsole::writeLine( "//=====================================================" );
 
@@ -329,15 +340,17 @@ namespace xcore
 			DumpStackTrace(uStack, uDepth, 0);
 
 			xconsole::writeLine();
+#endif
 		}
 
-		LONG WINAPI UnhandledExceptionFilter( PEXCEPTION_POINTERS pExceptionInfo )
+
+		LONG WINAPI UnhandledExceptionFilter(PEXCEPTION_POINTERS pExceptionInfo )
 		{
 			GenerateExceptionReport( pExceptionInfo );
 
-			if ( m_pPreviousFilter )
+			if (sCtxt->m_pPreviousFilter )
 			{
-				return m_pPreviousFilter( pExceptionInfo );
+				return sCtxt->m_pPreviousFilter( pExceptionInfo );
 			}
 			else
 			{
@@ -345,70 +358,23 @@ namespace xcore
 			}
 		}
 
-		//---------------
-		// Public Methods
-		//---------------
-		//---------------------------------------------------------------------------------------------------------------------
-
-		//==============================================================================
-		// Memory 
-		//==============================================================================
-
-		static void*	AllocSystemMemory			( u32 uSize )
+		void				init(x_iallocator* a, xctxt*& c)
 		{
-			void* heap = HeapAlloc(GetProcessHeap(), 0, uSize);
-			if(heap == NULL)
-			{
-				ASSERTS(false, "xcore::xsystem::AllocSystemMemory Error\n");
-			}
-			return heap;
-		}
-
-		//---------------------------------------------------------------------------------------------------------------------
-
-		static void		FreeSystemMemory			( void* pData )
-		{
-			BOOL boOK = HeapFree(GetProcessHeap(), 0, pData);
-			if(!boOK)
-			{
-				ASSERTS(false, "xcore::xsystem::FreeSystemMemory Error\n");
-			}
-		}
-
-		static void*	sWin32AllocFunc(xsize_t size)
-		{
-			return ::_aligned_malloc(size, X_MEMALIGN);
-		}
-		static void		sWin32FreeFunc(void* ptr)
-		{
-			::_aligned_free(ptr);
-		}
-
-		void				Initialise				(const char* szExePath, ESystemFlags systemflags)
-		{
-			xconsole::writeLine("INFO xcore: " TARGET_FULL_DESCR_STR );
-
-			x_strcpy(m_szExePath, MAX_EXE_PATH, szExePath);
+			// Allocator context
+			void * ctxt_mem = a->allocate(sizeof(xctxt), sizeof(void*));
+			c = new (ctxt_mem) xctxt(a);
+			sCtxt = c;
 
 			if(!IsDebuggerPresent())
 			{
 				// Install the unhandled exception filter function
-				m_pPreviousFilter = SetUnhandledExceptionFilter(UnhandledExceptionFilter);
+				c->m_pPreviousFilter = SetUnhandledExceptionFilter(UnhandledExceptionFilter);
 			}
-
-			s_uMemHeapTotalSize = (systemflags&MEM_MASK) * 1024*1024;
-			s_bGrowMemory = ((systemflags&MEM_SYSTEM)==MEM_SYSTEM);
-
-			//xmem_main_heap::_initialize();
-			u32 systemMemorySize = s_uMemHeapTotalSize - 128;
-			s_pMemHeapBase = AllocSystemMemory(systemMemorySize);
-// 			xmem_main_heap::_manage(s_pMemHeapBase, systemMemorySize);
-// 			if (s_bGrowMemory)
-// 				xmem_main_heap::_set_sys_calls(sWin32AllocFunc, sWin32FreeFunc);
 
 			//------------------------
 			// Dvd/Host mapping
 			//------------------------
+#if 0
 			if ((systemflags&DATA_FROM_MASK) == DATA_FROM_DVD)
 			{
 // 				xfilesystem::xalias dataFromDvd("data", "curdir");
@@ -419,124 +385,192 @@ namespace xcore
 // 				xfilesystem::xalias dataFromHost("data", "curdir");
 // 				xfilesystem::AddAlias(dataFromHost);
 			}
+#endif
 
 			//InitializeCpuInfo();
-			InitializeExecutableInfo();
-
+			InitializeExecutableInfo(c);
 		}
 
 		//---------------------------------------------------------------------------------------------------------------------
 
-		void				Update					( void )
+		void				update					(xctxt* c)
 		{
 
 		}
 
 		//---------------------------------------------------------------------------------------------------------------------
 
-		void				Shutdown				(void)
+		void				shutdown				(xctxt* c)
 		{
-// 			xmem_main_heap::_destroy();
-// 			xmem_main_heap::_set_sys_calls(NULL, NULL);
-			FreeSystemMemory(s_pMemHeapBase);
-
 			if(!IsDebuggerPresent())
 			{
 				// Uninstall the unhandled exception filter function
-				SetUnhandledExceptionFilter( m_pPreviousFilter );
+				SetUnhandledExceptionFilter( c->m_pPreviousFilter );
 			}
+
+			c->m_allocator->deallocate(c);
 		}
 
 		//---------------------------------------------------------------------------------------------------------------------
 		
-		void				FatalError				( void )
+		void				fatalError				( void )
 		{
 			exit(-1);
 		}
 
+		// Return the MAC address of this PC
+		MAC_t					getMAC(xctxt*)
+		{
+			MAC_t id;
+
+			IP_ADAPTER_INFO AdapterInfo[16];			// Allocate information for up to 16 NICs
+			DWORD dwBufLen = sizeof(AdapterInfo);		// Save the memory size of buffer
+
+			DWORD dwStatus = GetAdaptersInfo(			// Call GetAdapterInfo
+				AdapterInfo,							// [out] buffer to receive data
+				&dwBufLen);								// [in] size of receive data buffer
+			ASSERT(dwStatus == ERROR_SUCCESS);			// Verify return value is valid, no buffer overflow
+
+			PIP_ADAPTER_INFO pAdapterInfo = AdapterInfo;// Contains pointer to current adapter info
+			do
+			{
+				pAdapterInfo->Address;					// The MAC address
+
+														// Take the first 6 bytes
+				for (s32 i = 0; i<6; ++i)
+					id.mID[i] = pAdapterInfo->Address[i];
+
+				pAdapterInfo = pAdapterInfo->Next;		// Progress through linked list
+			} while (pAdapterInfo != NULL);				// Terminate if last adapter
+
+			return id;
+		}
+
+		bool					isCircleButtonBack()
+		{
+			return false;
+		}
+
+		s32						getNumCores(xctxt* c)
+		{
+			return 1;
+		}
+
+		s32						getNumHwThreadsPerCore(xctxt* c)
+		{
+			return 1;
+		}
+
+		u64						getCoreClockFrequency(xctxt* c)
+		{
+			return X_CONSTANT_U64(2 * 1024 * 1024 * 1024);
+		}
+
+		const char*				getPlatformName(xctxt* c)
+		{
+			return "Win32";
+		}
+
+		const char*				getBuildConfigName(xctxt* c)
+		{
+#if defined(TARGET_DEBUG)
+			return "Debug";
+#elif defined(TARGET_RELEASE)
+			return "Release";
+#elif defined(TARGET_FINAL  )
+			return "Final";
+#endif
+		}
+
+		const char*				getBuildModeName(xctxt* c)
+		{
+#if defined(TARGET_DEBUG)
+			return "Debug";
+#elif defined(TARGET_DEV)
+			return "Dev";
+#elif defined(TARGET_CLIENT)
+			return "Client";
+#elif defined(TARGET_RETAIL)
+			return "Retail";
+#endif
+		}
+
+
 		//---------------------------------------------------------------------------------------------------------------------
 
-		EConsoleType		GetConsoleType			( )
+		EConsoleType		getConsoleType			(xctxt* c)
 		{
-			return CONSOLE_DEVKIT;
+			return c->m_console_type;
 		}
 
 		//---------------------------------------------------------------------------------------------------------------------
 
-		EMediaType			GetMediaType			( )
+		EMediaType			getMediaType			(xctxt* c)
 		{
-			return MEDIA_HOST;
+			return c->m_media_type;
 		}
 
 		//---------------------------------------------------------------------------------------------------------------------
 
-		ELanguage			GetLanguage					( void )
+		ELanguage			getLanguage					(xctxt* c)
 		{
-			return m_uLanguage;//LANGUAGE_ENGLISH;
+			return c->m_uLanguage;//LANGUAGE_ENGLISH;
 		}
 
 		//---------------------------------------------------------------------------------------------------------------------
 
-		void				SetLanguage					( ELanguage language)
+		void				setLanguage					(xctxt* c, ELanguage language)
 		{
-			m_uLanguage = language;
+			c->m_uLanguage = language;
+		}
+
+		const char*			getLanguageStr(xctxt* c)
+		{
+			return gToString(c->m_uLanguage);
+		}
+
+
+		//---------------------------------------------------------------------------------------------------------------------
+
+		u64					getTotalMemorySize			(xctxt* c)
+		{
+			return c->m_uMemHeapTotalSize;
 		}
 
 		//---------------------------------------------------------------------------------------------------------------------
 
-		u32					GetMaxSystemMemory			( void )
+		u64					getCurrentSystemMemory		(xctxt* c)
 		{
-			return s_uMemHeapTotalSize;
+			return c->m_uMemHeapTotalSize;
 		}
 
 		//---------------------------------------------------------------------------------------------------------------------
 
-		u32					GetCurrentSystemMemory		( void )
-		{
-			return s_uMemHeapTotalSize;
-		}
-
-		//---------------------------------------------------------------------------------------------------------------------
-
-		void*				GetSystemMemoryBase			( void )
-		{
-			return s_pMemHeapBase;
-		}
-
-		//---------------------------------------------------------------------------------------------------------------------
-
-		void				Sleep						( u64 uMicroSec )
+		void				sleep						( u64 uMicroSec )
 		{
 			SleepEx((u32)(uMicroSec/(u64)1000), FALSE);
 		}
 
 		//---------------------------------------------------------------------------------------------------------------------
 
-		void				CreateStackTrace			( u32 uStartIndex, u64* pTrace, u32& ruDepth, u32 uMaxDepth, void* pContext )
+		void				createStackTrace			(xctxt* c, u32 uStartIndex, u64* pTrace, u32& ruDepth, u32 uMaxDepth)
 		{
-			static CONTEXT xContext;
-			if (pContext == NULL)
-			{
-				memset(&xContext, 0, sizeof(CONTEXT)); 
-
-				xContext.ContextFlags = CONTEXT_FULL;
-				__asm    call x
-				__asm x: pop eax
-				__asm    mov xContext.Eip, eax
-				__asm    mov xContext.Ebp, ebp
-				__asm    mov xContext.Esp, esp
-
-				pContext	= &xContext;
-			}
+			RtlCaptureContext(&c->m_xContext);
 
 			STACKFRAME64	StackFrame;
 
 			memset(&StackFrame, 0, sizeof(StackFrame));
+			CONTEXT& xContext = c->m_xContext;
 
+#if defined(TARGET_32BIT)
 			ADDRESS64	AddrPC		= { xContext.Eip, 0, AddrModeFlat };
-			ADDRESS64	AddrFrame	= { xContext.Ebp, 0, AddrModeFlat };
+			ADDRESS64	AddrFrame	= { xContext.Esp, 0, AddrModeFlat };
 			ADDRESS64	AddrStack	= { xContext.Esp, 0, AddrModeFlat };
-
+#else
+			ADDRESS64	AddrPC		= { xContext.Rip, 0, AddrModeFlat };
+			ADDRESS64	AddrFrame	= { xContext.Rsp, 0, AddrModeFlat };
+			ADDRESS64	AddrStack	= { xContext.Rsp, 0, AddrModeFlat };
+#endif
 			StackFrame.AddrPC		= AddrPC;
 			StackFrame.AddrFrame	= AddrFrame;
 			StackFrame.AddrStack	= AddrStack;
@@ -546,7 +580,7 @@ namespace xcore
 
 			while(1)
 			{
-				BOOL boOK = StackWalk64(IMAGE_FILE_MACHINE_I386, GetCurrentProcess(), GetCurrentThread(), &StackFrame, pContext, ReadProcessMemoryProc64, SymFunctionTableAccess64, SymGetModuleBase64, NULL);
+				BOOL boOK = StackWalk64(IMAGE_FILE_MACHINE_I386, GetCurrentProcess(), GetCurrentThread(), &StackFrame, c->m_pContext, ReadProcessMemoryProc64, SymFunctionTableAccess64, SymGetModuleBase64, NULL);
 
 				if(!boOK || StackFrame.AddrPC.Offset == 0)
 				{
@@ -571,8 +605,9 @@ namespace xcore
 		}
 
 
-		void				DumpStackTrace				( u64* pTrace, u32 uDepth, const char* sExePath )
+		void				dumpStackTrace				(xctxt* ctx, u64* pTrace, u32 uDepth, const char* sExePath )
 		{
+#if 0
 			BOOL boOK = SymInitialize(GetCurrentProcess(), NULL, TRUE);
 
 			for(u32 uI = 0; uI < uDepth; uI++)
@@ -593,8 +628,8 @@ namespace xcore
 				char	szName[MAX_STACK_NAME_LEN];
 				char	szFullName[MAX_STACK_NAME_LEN];
 
-				x_strcpy(szName, MAX_STACK_NAME_LEN, "");
-				x_strcpy(szFullName, MAX_STACK_NAME_LEN, "");
+				ascii::copy(szName, szName + MAX_STACK_NAME_LEN - 1, "", NULL);
+				ascii::copy(szFullName, szFullName + MAX_STACK_NAME_LEN -1, "", NULL);
 
 				if(!boOK)
 				{
@@ -618,6 +653,7 @@ namespace xcore
 			}
 
 			SymCleanup(GetCurrentProcess());
+#endif
 		}
 
 

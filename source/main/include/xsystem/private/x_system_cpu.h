@@ -8,23 +8,13 @@
 
 namespace xcore
 {
-	class xicpu_info;
-
 	class xcpu_info
 	{
-	public:
-						xcpu_info() : mCpuInfo(NULL)	{ }
-
-		void			initialize();
+		static void			initialize();
 		
-		void			print();
+		static s32			getPhysicalProcessors ();
+		static s32			getLogicalProcessorsPerPhysical ();
 
-		u64				getCPUSpeedInkHz() const;
-		u64				getCPUSpeedInMHz() const;
-		s32				getPhysicalProcessors () const;
-		s32				getLogicalProcessorsPerPhysical () const;
-	private:
-		xicpu_info*		mCpuInfo;
 	};
 }
 
