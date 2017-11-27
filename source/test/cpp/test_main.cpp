@@ -98,10 +98,10 @@ bool gRunUnitTest(UnitTest::TestReporter& reporter)
 	xcore::xconsole::write("Configuration: ");
 	xcore::xconsole::writeLine(TARGET_FULL_DESCR_STR);
 
-	xcore::xsystem::init(gTestAllocator, gCtxt);
-
 	xcore::TestAllocator testAllocator(systemAllocator);
 	gTestAllocator = &testAllocator;
+
+	xcore::xsystem::init(gTestAllocator, gCtxt);
 
 	int r = UNITTEST_SUITE_RUN(reporter, xCoreUnitTest);
 
