@@ -68,7 +68,7 @@ namespace xcore
 
 			x_iallocator*					m_allocator;
 			char							m_szAppTitle[128];
-			char							m_szExePath[MAX_EXE_PATH];
+			char							m_szExePath[MAX_EXE_PATH + 1];
 			char							m_szNickName[128];
 			u64								m_uMemHeapTotalSize;
 			ELanguage						m_uLanguage;
@@ -107,9 +107,12 @@ namespace xcore
 		//---------------------------------------------------------------------------------------------------------------------
 		void InitializeExecutableInfo(xctxt* c)
 		{
-			HMODULE hModule = 0;
+			HMODULE cb[64];
 
-			EnumProcessModules(GetCurrentProcess(),&hModule,sizeof(hModule),0);
+			DWORD cbNeeded;
+			EnumProcessModules(GetCurrentProcess(), cb, sizeof(cb), &cbNeeded);
+			
+			HMODULE hModule = cb[0];
 
 			MEMORY_BASIC_INFORMATION mbi;
 
@@ -118,7 +121,7 @@ namespace xcore
 				return;
 			}
 
-			::GetModuleFileNameExA(GetCurrentProcess(), hModule, c->m_szExePath, sizeof(c->m_szExePath));
+			::GetModuleFileNameExA(GetCurrentProcess(), hModule, c->m_szExePath, MAX_EXE_PATH);
 
 			PVOID hMod = (PVOID)mbi.AllocationBase;
 

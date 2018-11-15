@@ -17,7 +17,7 @@ UNITTEST_SUITE_BEGIN(basic_info)
 		{
 			xcore::xsystem::EConsoleType consoleType = xcore::xsystem::getConsoleType(gCtxt);
 #ifdef TARGET_PC
-			CHECK_TRUE(consoleType == xcore::xsystem::EConsoleType::CONSOLE_DEVKIT);
+			CHECK_TRUE(consoleType == xcore::xsystem::EConsoleType::CONSOLE_DESKTOP);
 #endif
 			
 		}
@@ -33,7 +33,7 @@ UNITTEST_SUITE_BEGIN(basic_info)
 		{
 			xcore::xsystem::EMediaType mediaType = xcore::xsystem::getMediaType(gCtxt);
 #ifdef TARGET_PC
-			CHECK_TRUE(mediaType == xcore::xsystem::EMediaType::MEDIA_LOCAL);
+			CHECK_TRUE(mediaType == xcore::xsystem::EMediaType::MEDIA_HDD);
 #endif
 
 		}
