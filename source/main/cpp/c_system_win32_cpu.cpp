@@ -1,10 +1,7 @@
-﻿#include "xbase/x_target.h"
+﻿#include "cbase/c_target.h"
 
 #ifdef TARGET_PC
 
-//==============================================================================
-// INCLUDES
-//==============================================================================
 #define WIN32_LEAN_AND_MEAN
 #define NOGDI
 #define NOMB
@@ -26,19 +23,16 @@
 #include <string>
 #include <thread>
 
-#include "xbase/x_debug.h"
-#include "xbase/x_string_ascii.h"
-#include "xbase/x_memory_std.h"
+#include "cbase/c_debug.h"
+#include "cbase/c_string_ascii.h"
+#include "cbase/c_memory_std.h"
 
-#include "xsystem/x_system.h"
-#include "xsystem/private/x_system_cpu.h"
+#include "csystem/c_system.h"
+#include "csystem/private/c_system_cpu.h"
 
-//==============================================================================
-// xCore namespace
-//==============================================================================
-namespace xcore
+namespace ncore
 {
-	namespace xcpu_info_win32
+	namespace ncpu_info_win32
 	{
 		struct cache_descr
 		{
@@ -585,23 +579,19 @@ namespace xcore
 	}
 	//---------------------------------------------------------------------------------------------------------------------
 
-	void			xcpu_info::initialize()
+	void			cpu_info_t::initialize()
 	{
 	}
 
-	s32				xcpu_info::getPhysicalProcessors ()
+	s32				cpu_info_t::getPhysicalProcessors ()
 	{
 		return std::thread::hardware_concurrency();
 	}
 
-	s32				xcpu_info::getLogicalProcessorsPerPhysical ()
+	s32				cpu_info_t::getLogicalProcessorsPerPhysical ()
 	{
 		return 1;
 	}
-
-	//==============================================================================
-	// END xCore namespace
-	//==============================================================================
 };
 
 #endif // TARGET_PC

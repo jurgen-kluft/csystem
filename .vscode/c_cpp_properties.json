@@ -1,0 +1,23 @@
+{
+    "configurations": [
+        {
+            "name": "Mac",
+            "includePath": [
+                "/Users/obnosis1/dev.go/src/github.com/jurgen-kluft/cbase/source/main/include",
+                "/Users/obnosis1/dev.go/src/github.com/jurgen-kluft/cunittest/source/main/include",
+                "/Users/obnosis1/dev.go/src/github.com/jurgen-kluft/csystem/source/main/include"
+            ],
+            "defines": [
+                "TARGET_MAC_DEV_DEBUG"
+            ],
+            "macFrameworkPath": [
+                "/Library/Developer/CommandLineTools/SDKs/MacOSX10.15.sdk/System/Library/Frameworks"
+            ],
+            "compilerPath": "/usr/bin/clang",
+            "cStandard": "c11",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "clang-x64"
+        }
+    ],
+    "version": 4
+}
