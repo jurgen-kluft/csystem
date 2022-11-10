@@ -1,10 +1,10 @@
-#include "xbase/x_target.h"
+#include "cbase/c_target.h"
 #include "xsystem/x_system.h"
 #include "xsystem/private/x_system_win32.h"
-#include "xunittest/xunittest.h"
+#include "cunittest/cunittest.h"
 
-extern xcore::x_iallocator* gTestAllocator;
-extern xcore::xsystem::xctxt* gCtxt;
+extern ncore::x_iallocator* gTestAllocator;
+extern ncore::xsystem::xctxt* gCtxt;
 
 UNITTEST_SUITE_BEGIN(basic_info)
 {
@@ -15,9 +15,9 @@ UNITTEST_SUITE_BEGIN(basic_info)
 
 		UNITTEST_TEST(check)
 		{
-			xcore::xsystem::EConsoleType consoleType = xcore::xsystem::getConsoleType(gCtxt);
+			ncore::xsystem::EConsoleType consoleType = ncore::xsystem::getConsoleType(gCtxt);
 #ifdef TARGET_PC
-			CHECK_TRUE(consoleType == xcore::xsystem::EConsoleType::CONSOLE_DESKTOP);
+			CHECK_TRUE(consoleType == ncore::xsystem::EConsoleType::CONSOLE_DESKTOP);
 #endif
 			
 		}
@@ -31,9 +31,9 @@ UNITTEST_SUITE_BEGIN(basic_info)
 
 		UNITTEST_TEST(check)
 		{
-			xcore::xsystem::EMediaType mediaType = xcore::xsystem::getMediaType(gCtxt);
+			ncore::xsystem::EMediaType mediaType = ncore::xsystem::getMediaType(gCtxt);
 #ifdef TARGET_PC
-			CHECK_TRUE(mediaType == xcore::xsystem::EMediaType::MEDIA_HDD);
+			CHECK_TRUE(mediaType == ncore::xsystem::EMediaType::MEDIA_HDD);
 #endif
 
 		}
@@ -46,9 +46,9 @@ UNITTEST_SUITE_BEGIN(basic_info)
 
 		UNITTEST_TEST(check)
 		{
-			xcore::xsystem::setLanguage(gCtxt, xcore::xsystem::ELanguage::LANGUAGE_ENGLISH);//xcore::xsystem::GetLanguage();
-			xcore::xsystem::ELanguage lan = xcore::xsystem::getLanguage(gCtxt);
-			CHECK_TRUE(lan == xcore::xsystem::ELanguage::LANGUAGE_ENGLISH);
+			ncore::xsystem::setLanguage(gCtxt, ncore::xsystem::ELanguage::LANGUAGE_ENGLISH);//ncore::xsystem::GetLanguage();
+			ncore::xsystem::ELanguage lan = ncore::xsystem::getLanguage(gCtxt);
+			CHECK_TRUE(lan == ncore::xsystem::ELanguage::LANGUAGE_ENGLISH);
 
 		}
 	}
@@ -60,13 +60,13 @@ UNITTEST_SUITE_BEGIN(basic_info)
 
 		UNITTEST_TEST(check)
 		{
-			const char* path = xcore::xsystem::getExePath(gCtxt);
+			const char* path = ncore::xsystem::getExePath(gCtxt);
 			CHECK_TRUE(path != NULL);
 
-			//xcore::u32 maxSystemMemory = xcore::xsystem::getMaxSystemMemory();
+			//ncore::u32 maxSystemMemory = ncore::xsystem::getMaxSystemMemory();
 			//CHECK_TRUE(maxSystemMemory >= 0);
 
-			//xcore::u32 currentSystemMemory = xcore::xsystem::getCurrentSystemMemory();
+			//ncore::u32 currentSystemMemory = ncore::xsystem::getCurrentSystemMemory();
 			//CHECK_TRUE(currentSystemMemory>= 0);
 
 		}

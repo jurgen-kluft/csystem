@@ -1,11 +1,11 @@
-#include "xbase/x_target.h"
+#include "cbase/c_target.h"
 #include "xsystem/x_system.h"
 #include "xsystem/private/x_system_win32.h"
-#include "xunittest/xunittest.h"
+#include "cunittest/cunittest.h"
 
 
-extern xcore::x_iallocator* gTestAllocator;
-extern xcore::xsystem::xctxt* gCtxt;
+extern ncore::x_iallocator* gTestAllocator;
+extern ncore::xsystem::xctxt* gCtxt;
 
 
 UNITTEST_SUITE_BEGIN(exe_info)
@@ -17,16 +17,16 @@ UNITTEST_SUITE_BEGIN(exe_info)
 
 		UNITTEST_TEST(check)
 		{
-			xcore::s32 codeSize = xcore::xsystem::getCodeSegmentSize(gCtxt);
+			ncore::s32 codeSize = ncore::xsystem::getCodeSegmentSize(gCtxt);
 			CHECK_TRUE(codeSize >= 0);
 
-			xcore::s32 dataSize = xcore::xsystem::getDataSegmentSize(gCtxt);
+			ncore::s32 dataSize = ncore::xsystem::getDataSegmentSize(gCtxt);
 			CHECK_TRUE(dataSize >= 0);
 
-			xcore::s32 bssSize	= xcore::xsystem::getBssSegmentSize(gCtxt);
+			ncore::s32 bssSize	= ncore::xsystem::getBssSegmentSize(gCtxt);
 			CHECK_TRUE(bssSize >= 0);
 
-			xcore::s32 stackSize = xcore::xsystem::getMainThreadStackSize(gCtxt);
+			ncore::s32 stackSize = ncore::xsystem::getMainThreadStackSize(gCtxt);
 			CHECK_TRUE(stackSize >= 0);
 
 		}
