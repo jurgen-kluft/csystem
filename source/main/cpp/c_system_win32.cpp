@@ -55,7 +55,6 @@ namespace ncore
             , m_dataSegmentSize(0)
             , m_imageSize(0)
             , m_mainThreadStackSize(0)
-            , m_pContext(NULL)
         {
         }
 
@@ -64,6 +63,7 @@ namespace ncore
         char         m_szExePath[MAX_EXE_PATH + 1];
         char         m_szNickName[128];
         u64          m_uMemHeapTotalSize;
+        u64          m_uMemHeapFreeSize;
         ELanguage    m_uLanguage;
         bool         m_isCircleButtonBack;
         EConsoleType m_console_type;
@@ -73,11 +73,20 @@ namespace ncore
         s32          m_dataSegmentSize;
         s32          m_imageSize;
         u64          m_mainThreadStackSize;
+        s32          m_num_cores;
+        s32          m_num_hwthreads_per_core;
+        u64          m_core_clock_frequency;
+        s32          m_OSVersion;
+        bool         m_is64Bit;
+        bool         m_hasHyperThreading;
+        s64          m_cpuClockFrequency;
+        s32          m_logicalProcessors;
+        s32          m_physicalProcessors;
 
         DCORE_CLASS_PLACEMENT_NEW_DELETE
     };
 
-    void InitializeExecutableInfo(s32& codeSegmentSize, s32& bssSegmentSize, s32& dataSegmentSize, s32& imageSize, s32& mainThreadStackSize)
+    void InitializeExecutableInfo(system_t::instance_t* c, s32& codeSegmentSize, s32& bssSegmentSize, s32& dataSegmentSize, s32& imageSize, u64& mainThreadStackSize)
     {
         HMODULE cb[64];
 
@@ -193,7 +202,7 @@ namespace ncore
         for (unsigned i = 0; i < pNtHdr->FileHeader.NumberOfSections; i++, pSection++)
         {
             DWORD sectionStart = pSection->VirtualAddress;
-            DWORD sectionEnd   = sectionStart + x_intu::max(pSection->SizeOfRawData, pSection->Misc.VirtualSize);
+            DWORD sectionEnd   = sectionStart + math::max(pSection->SizeOfRawData, pSection->Misc.VirtualSize);
 
             // Is the address in this section???
             if ((rva >= sectionStart) && (rva <= sectionEnd))
@@ -273,34 +282,35 @@ namespace ncore
     {
         GenerateExceptionReport(pExceptionInfo);
 
-        if (system_t::getSystem()->m_instance->m_pPreviousFilter)
-        {
-            return system_t::getSystem()->m_instance->m_pPreviousFilter(pExceptionInfo);
-        }
-        else
-        {
-            return EXCEPTION_EXECUTE_HANDLER;
-        }
+        // if (system_t::getSystem()->m_instance->m_pPreviousFilter)
+        // {
+        //     return system_t::getSystem()->m_instance->m_pPreviousFilter(pExceptionInfo);
+        // }
+        // else
+        // {
+        //     return EXCEPTION_EXECUTE_HANDLER;
+        // }
     }
 
-    void createStackTrace(u32 uStartIndex, u64* pTrace, u32& ruDepth, u32 uMaxDepth)
+    void createStackTrace(system_t::instance_t* instance, u32 uStartIndex, u64* pTrace, u32& ruDepth, u32 uMaxDepth)
     {
-        RtlCaptureContext(&m_instance->m_xContext);
+#    if 0
+        RtlCaptureContext(&instance->m_xContext);
 
         STACKFRAME64 StackFrame;
 
         memset(&StackFrame, 0, sizeof(StackFrame));
         CONTEXT& xContext = m_instance->m_xContext;
 
-#    if defined(TARGET_32BIT)
+#        if defined(TARGET_32BIT)
         ADDRESS64 AddrPC    = {xContext.Eip, 0, AddrModeFlat};
         ADDRESS64 AddrFrame = {xContext.Esp, 0, AddrModeFlat};
         ADDRESS64 AddrStack = {xContext.Esp, 0, AddrModeFlat};
-#    else
+#        else
         ADDRESS64 AddrPC = {xContext.Rip, 0, AddrModeFlat};
         ADDRESS64 AddrFrame = {xContext.Rsp, 0, AddrModeFlat};
         ADDRESS64 AddrStack = {xContext.Rsp, 0, AddrModeFlat};
-#    endif
+#        endif
         StackFrame.AddrPC    = AddrPC;
         StackFrame.AddrFrame = AddrFrame;
         StackFrame.AddrStack = AddrStack;
@@ -332,9 +342,10 @@ namespace ncore
                 uDepth++;
             }
         }
+#    endif
     }
 
-    void dumpStackTrace(ctxt_t* ctx, u64* pTrace, u32 uDepth, const char* sExePath)
+    static void dumpStackTrace(u64* pTrace, u32 uDepth, const char* sExePath)
     {
 #    if 0
 			BOOL boOK = SymInitialize(GetCurrentProcess(), NULL, TRUE);
@@ -385,11 +396,18 @@ namespace ncore
 #    endif
     }
 
+    static u64  getRamTotal() {}
+    static u64  getRamFree() {}
+    static u64  getOSVersion() {}
+    static bool is64BitOS() { return true; }
+    static u64  getCPUInfo(s32& logicalCores, s32& physicalCores) {}
+    static u64  getCpuClockSpeed() {}
+
     void system_t::init(alloc_t* a)
     {
-        void* instance_mem      = allocator->allocate(sizeof(instance_t), sizeof(void*));
-        m_instance              = new (instance_mem) instance_t(allocator);
-        m_instance->m_allocator = allocator;
+        void* instance_mem      = a->allocate(sizeof(instance_t), sizeof(void*));
+        m_instance              = new (instance_mem) instance_t(a);
+        m_instance->m_allocator = a;
 
         nmem::memset(m_instance->m_szAppTitle, 0, sizeof(m_instance->m_szAppTitle));
         nmem::memset(m_instance->m_szExePath, 0, sizeof(m_instance->m_szExePath));
@@ -418,10 +436,10 @@ namespace ncore
         if (!IsDebuggerPresent())
         {
             // Install the unhandled exception filter function
-            m_instance->m_pPreviousFilter = SetUnhandledExceptionFilter(UnhandledExceptionFilter);
+            // m_instance->m_pPreviousFilter = SetUnhandledExceptionFilter(UnhandledExceptionFilter);
         }
 
-        InitializeExecutableInfo();
+        InitializeExecutableInfo(m_instance, m_instance->m_codeSegmentSize, m_instance->m_bssSegmentSize, m_instance->m_dataSegmentSize, m_instance->m_imageSize, m_instance->m_mainThreadStackSize);
     }
 
     void system_t::update() {}
@@ -431,7 +449,7 @@ namespace ncore
         if (!IsDebuggerPresent())
         {
             // Uninstall the unhandled exception filter function
-            SetUnhandledExceptionFilter(m_instance->m_pPreviousFilter);
+            // SetUnhandledExceptionFilter(m_instance->m_pPreviousFilter);
         }
 
         m_instance->m_allocator->deallocate(m_instance);
@@ -441,18 +459,17 @@ namespace ncore
 
     void fatalError(void) { exit(-1); }
 
-    bool         system_t::isCircleButtonBack() const { return m_instance->m_isCircleButtonBack; }
-    s32          system_t::getNumCores() const { return m_instance->m_num_cores; }
-    s32          system_t::getNumHwThreadsPerCore() const { return m_instance->m_num_hwthreads_per_core; }
-    u64          system_t::getCoreClockFrequency() const { return m_instance->m_core_clock_frequency; }
-    const char*  system_t::getPlatformName() const { return "Win32"; }
-    EConsoleType system_t::getConsoleType() { return m_instance->m_console_type; }
-    EMediaType   system_t::getMediaType() { return m_instance->m_media_type; }
-    ELanguage    system_t::getLanguage() { return m_instance->m_uLanguage; }
-    void         system_t::setLanguage(ELanguage language) { m_instance->m_uLanguage = language; }
-    u64          system_t::getTotalMemorySize() { return m_instance->m_uMemHeapTotalSize; }
-    u64          system_t::getCurrentSystemMemory() { return m_instance->m_uMemHeapTotalSize; }
-
+    bool                   system_t::isCircleButtonBack() const { return m_instance->m_isCircleButtonBack; }
+    s32                    system_t::getNumCores() const { return m_instance->m_num_cores; }
+    s32                    system_t::getNumHwThreadsPerCore() const { return m_instance->m_num_hwthreads_per_core; }
+    u64                    system_t::getCoreClockFrequency() const { return m_instance->m_core_clock_frequency; }
+    const char*            system_t::getPlatformName() const { return "Win32"; }
+    system_t::EConsoleType system_t::getConsoleType() const { return m_instance->m_console_type; }
+    system_t::EMediaType   system_t::getMediaType() const { return m_instance->m_media_type; }
+    system_t::ELanguage    system_t::getLanguage() const { return m_instance->m_uLanguage; }
+    void                   system_t::setLanguage(ELanguage language) { m_instance->m_uLanguage = language; }
+    u64                    system_t::getTotalMemorySize() const { return m_instance->m_uMemHeapTotalSize; }
+    u64                    system_t::getCurrentSystemMemory() const { return m_instance->m_uMemHeapTotalSize; }
 }; // namespace ncore
 
 #endif // TARGET_PC

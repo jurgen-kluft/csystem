@@ -104,6 +104,9 @@ namespace ncore
         const char* getLanguageString(ELanguage) const;
         void        setLanguage(ELanguage language);
 
+        u64 getTotalMemorySize() const;
+        u64 getCurrentSystemMemory() const;
+
         const char* getUnixEndLine();
         const char* getWindowsEndLine();
         const char* getEndLine();
