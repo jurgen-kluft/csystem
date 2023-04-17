@@ -1,3 +1,3 @@
-# xcore system library
+# ccore system library
 
 A system (hardware, features, settings) functionality library 

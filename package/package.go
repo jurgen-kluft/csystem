@@ -1,10 +1,10 @@
 package csystem
 
 import (
-	"github.com/jurgen-kluft/cbase/package"
+	cbase "github.com/jurgen-kluft/cbase/package"
 	"github.com/jurgen-kluft/ccode/denv"
-	"github.com/jurgen-kluft/centry/package"
-	"github.com/jurgen-kluft/cunittest/package"
+	centry "github.com/jurgen-kluft/centry/package"
+	cunittest "github.com/jurgen-kluft/cunittest/package"
 )
 
 // GetPackage returns the package object of 'csystem'

@@ -1,10 +1,9 @@
-﻿#include "cbase/c_target.h"
+#include "cbase/c_target.h"
+
+// TODO: remove use of std::string and std::array
 
 #ifdef TARGET_PC
 
-//==============================================================================
-// INCLUDES
-//==============================================================================
 #define WIN32_LEAN_AND_MEAN
 #define NOGDI
 #define NOMB
@@ -27,18 +26,13 @@
 #include <thread>
 
 #include "cbase/c_debug.h"
-#include "cbase/c_runes.h"
 #include "cbase/c_memory.h"
 
 #include "csystem/c_system.h"
-#include "csystem/private/c_system_cpu.h"
 
-//==============================================================================
-// xCore namespace
-//==============================================================================
 namespace ncore
 {
-	namespace ncpu
+	namespace ncpu_info_windows
 	{
 		struct cache_descr
 		{
@@ -271,10 +265,7 @@ namespace ncore
 			bool ECMD(void) { __cpuid(registers.data(), 6); return registers[0] & (0x1 << 5); }
 			bool PTM(void) { __cpuid(registers.data(), 6); return registers[0] & (0x1 << 6); }
 
-
-
 			std::string getCacheTopology();
-
 
 		private:
 			void CPUIDExtended();
@@ -341,7 +332,6 @@ namespace ncore
 				__cpuid(startOfArray, k);
 			}
 		}
-
 
 		int8_t CPUInfo::getStepping()
 		{
@@ -494,7 +484,6 @@ namespace ncore
 
 		std::string CPUInfo::getCacheInfo()
 		{
-
 			registers[0] = 0xffffffff;
 			int count = 0;
 
@@ -585,20 +574,19 @@ namespace ncore
 	}
 	//---------------------------------------------------------------------------------------------------------------------
 
-	void			ncpu::initialize()
+	void			cpu_info_t::initialize()
 	{
 	}
 
-	s32				ncpu::getPhysicalProcessors ()
+	s32				cpu_info_t::getPhysicalProcessors ()
 	{
 		return std::thread::hardware_concurrency();
 	}
 
-	s32				ncpu::getLogicalProcessorsPerPhysical ()
+	s32				cpu_info_t::getLogicalProcessorsPerPhysical ()
 	{
 		return 1;
 	}
-
 };
 
 #endif // TARGET_PC

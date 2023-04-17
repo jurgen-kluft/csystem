@@ -1,59 +1,57 @@
 #include "cbase/c_target.h"
-
-
-//==============================================================================
-// INCLUDES
-//==============================================================================
-
 #include "cbase/c_debug.h"
-#include "cbase/c_string_ascii.h"
 
-#include "xsystem/x_system.h"
+#include "csystem/c_system.h"
 
-
-//==============================================================================
-// xCore namespace
-//==============================================================================
 namespace ncore
 {
-	namespace xsystem
-	{
-		const char* sLanguageStr[] = 
-		{
-			"English",
-			"French",
-			"Italian",
-			"German",
-			"Spanish",
-			"Greek",
-			"English US",
-			"French US",
-			"Portuguese",
-			"Brazilian",
-			"Japanese",
-			"Chinese",
-			"Korean",
-			"Russian",
-			"Dutch",
-			"Chinese traditional",
-			"Chinese simplified",
-			"Finnish",
-			"Swedish",
-			"Danish",
-			"Norwegian",
-			"Polish",
-		};
+    static system_t* sSystem = NULL;
+    void             system_t::setSystem(system_t* system) { sSystem = system; }
+    system_t*        system_t::getSystem() { return sSystem; }
 
-		const char*		gToString(ELanguage language)
-		{
-			return (sLanguageStr[language]);
-		}
+    bool system_t::isLittleEndian() const
+    {
+        char16_t test = 0x0102;
+        return ((char*)&test)[0] == 0x02;
+    }
 
-	};
+    bool system_t::isBigEndian() const
+    {
+        return !isLittleEndian();
+    }
 
-	//==============================================================================
-	// END xCore namespace
-	//==============================================================================
-};
+    static const char* sLanguageStr[] = {
+        "English", "French",  "Italian", "German",    "Spanish", "Greek", "English US", "French US", "Portuguese", "Brazilian", "Japanese", "Chinese", "Korean", "Russian", "Dutch", "Chinese traditional", "Chinese simplified",
+        "Finnish", "Swedish", "Danish",  "Norwegian", "Polish",
+    };
 
+    const char* system_t::getLanguageString(ELanguage language) const { return (sLanguageStr[language]); }
 
+    const char* system_t::getUnixEndLine() { return "\n"; }
+    const char* system_t::getWindowsEndLine() { return "\r\n"; }
+
+    const char* system_t::getBuildConfigName() const
+    {
+#    if defined(TARGET_DEBUG)
+        return "Debug";
+#    elif defined(TARGET_RELEASE)
+        return "Release";
+#    elif defined(TARGET_FINAL)
+        return "Final";
+#    endif
+    }
+
+    const char* system_t::getBuildModeName() const
+    {
+#    if defined(TARGET_DEBUG)
+        return "Debug";
+#    elif defined(TARGET_DEV)
+        return "Dev";
+#    elif defined(TARGET_CLIENT)
+        return "Client";
+#    elif defined(TARGET_RETAIL)
+        return "Retail";
+#    endif
+    }
+
+}; // namespace ncore
