@@ -1,11 +1,8 @@
 #include "cbase/c_target.h"
-#include "xsystem/x_system.h"
-#include "xsystem/private/x_system_win32.h"
+#include "csystem/c_system.h"
+#include "csystem/private/c_system_win32.h"
+
 #include "cunittest/cunittest.h"
-
-
-extern ncore::x_iallocator* gTestAllocator;
-extern ncore::xsystem::xctxt* gCtxt;
 
 
 UNITTEST_SUITE_BEGIN(exe_info)
