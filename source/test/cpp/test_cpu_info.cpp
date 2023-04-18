@@ -1,9 +1,14 @@
 #include "cbase/c_target.h"
+#include "cbase/c_allocator.h"
+
 #include "csystem/c_system.h"
-#include "csystem/private/c_system_win32.h"
 
 #include "cunittest/cunittest.h"
 
+namespace ncore
+{
+    extern void GetCpuInfo();
+}
 
 UNITTEST_SUITE_BEGIN(cpu_info)
 {
@@ -12,10 +17,9 @@ UNITTEST_SUITE_BEGIN(cpu_info)
 		UNITTEST_FIXTURE_SETUP() {}
 		UNITTEST_FIXTURE_TEARDOWN() {}
 
-		UNITTEST_TEST(check)
-		{
-			
-
+		UNITTEST_TEST(check) 
+		{ 
+			ncore::GetCpuInfo();
 		}
 	}
 }

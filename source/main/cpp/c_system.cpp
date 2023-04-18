@@ -5,9 +5,15 @@
 
 namespace ncore
 {
-    static system_t* sSystem = NULL;
+    static system_t* sSystem = nullptr;
+
     void             system_t::setSystem(system_t* system) { sSystem = system; }
     system_t*        system_t::getSystem() { return sSystem; }
+
+    bool system_t::is64BitOS() const
+    {
+        return sizeof(void*) == 8;
+    }
 
     bool system_t::isLittleEndian() const
     {

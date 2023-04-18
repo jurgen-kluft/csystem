@@ -1,10 +1,11 @@
 package main
 
 import (
-	"github.com/jurgen-kluft/ccode"
-	csystem "github.com/jurgen-kluft/csystem/package"
+	ccode "github.com/jurgen-kluft/ccode"
+	cpkg "github.com/jurgen-kluft/csystem/package"
 )
 
 func main() {
-	ccode.Generate(csystem.GetPackage())
+	ccode.Init()
+	ccode.Generate(cpkg.GetPackage())
 }

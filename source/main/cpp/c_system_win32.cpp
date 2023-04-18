@@ -1,5 +1,6 @@
 #include "cbase/c_base.h"
 #include "cbase/c_allocator.h"
+#include "cbase/c_runes.h"
 
 #if defined(TARGET_PC)
 
@@ -68,6 +69,8 @@ namespace ncore
         bool         m_isCircleButtonBack;
         EConsoleType m_console_type;
         EMediaType   m_media_type;
+        EDataSource  m_data_source;
+        EEnvMode     m_env_mode;
         s32          m_codeSegmentSize;
         s32          m_bssSegmentSize;
         s32          m_dataSegmentSize;
@@ -96,11 +99,11 @@ namespace ncore
         HMODULE                  hModule = cb[0];
         MEMORY_BASIC_INFORMATION mbi;
 
-        s32 codeSegmentSize     = 0;
-        s32 bssSegmentSize      = 0;
-        s32 dataSegmentSize     = 0;
-        s32 imageSize           = 0;
-        s32 mainThreadStackSize = 0;
+        codeSegmentSize     = 0;
+        bssSegmentSize      = 0;
+        dataSegmentSize     = 0;
+        imageSize           = 0;
+        mainThreadStackSize = 0;
 
         if (!VirtualQuery(hModule, &mbi, sizeof(mbi)))
         {
@@ -290,6 +293,7 @@ namespace ncore
         // {
         //     return EXCEPTION_EXECUTE_HANDLER;
         // }
+        return EXCEPTION_EXECUTE_HANDLER;
     }
 
     void createStackTrace(system_t::instance_t* instance, u32 uStartIndex, u64* pTrace, u32& ruDepth, u32 uMaxDepth)
@@ -396,12 +400,11 @@ namespace ncore
 #    endif
     }
 
-    static u64  getRamTotal() {}
-    static u64  getRamFree() {}
-    static u64  getOSVersion() {}
-    static bool is64BitOS() { return true; }
-    static u64  getCPUInfo(s32& logicalCores, s32& physicalCores) {}
-    static u64  getCpuClockSpeed() {}
+    static u64  getRamTotal() { return 0; }
+    static u64  getRamFree() { return 0; }
+    static s32  getOSVersion() { return 0; }
+    static bool getCPUInfo(s32& logicalCores, s32& physicalCores) { return false; }
+    static u64  getCpuClockSpeed() { return 0; }
 
     void system_t::init(alloc_t* a)
     {
@@ -466,10 +469,28 @@ namespace ncore
     const char*            system_t::getPlatformName() const { return "Win32"; }
     system_t::EConsoleType system_t::getConsoleType() const { return m_instance->m_console_type; }
     system_t::EMediaType   system_t::getMediaType() const { return m_instance->m_media_type; }
-    system_t::ELanguage    system_t::getLanguage() const { return m_instance->m_uLanguage; }
-    void                   system_t::setLanguage(ELanguage language) { m_instance->m_uLanguage = language; }
-    u64                    system_t::getTotalMemorySize() const { return m_instance->m_uMemHeapTotalSize; }
-    u64                    system_t::getCurrentSystemMemory() const { return m_instance->m_uMemHeapTotalSize; }
+    system_t::EDataSource  system_t::getDataSource() const { return m_instance->m_data_source; }
+    system_t::EEnvMode     system_t::getEnvMode() const { return m_instance->m_env_mode; }
+
+    system_t::ELanguage system_t::getLanguage() const { return m_instance->m_uLanguage; }
+    void                system_t::setLanguage(ELanguage language) { m_instance->m_uLanguage = language; }
+    u64                 system_t::getTotalMemorySize() const { return m_instance->m_uMemHeapTotalSize; }
+    u64                 system_t::getCurrentSystemMemory() const { return m_instance->m_uMemHeapTotalSize; }
+
+    u64 system_t::getCodeSegmentSize() const { return m_instance->m_codeSegmentSize; }
+    u64 system_t::getBssSegmentSize() const { return m_instance->m_bssSegmentSize; }
+    u64 system_t::getDataSegmentSize() const { return m_instance->m_dataSegmentSize; }
+    u64 system_t::getMainThreadStackSize() const { return m_instance->m_mainThreadStackSize; }
+
+    void system_t::setAppTitle(const char* title)
+    {
+        runes_t  dst(m_instance->m_szAppTitle, m_instance->m_szAppTitle, m_instance->m_szAppTitle + sizeof(m_instance->m_szAppTitle) - 1);
+        crunes_t src(title);
+        copy(src, dst);
+    }
+    const char* system_t::getAppTitle() const { return m_instance->m_szAppTitle; }
+    const char* system_t::getExePath() const { return m_instance->m_szExePath; }
+
 }; // namespace ncore
 
 #endif // TARGET_PC

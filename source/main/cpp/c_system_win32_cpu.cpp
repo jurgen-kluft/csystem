@@ -29,6 +29,120 @@ namespace ncore
 {
     namespace ncpu
     {
+
+        static void IntToString(char*& str, char const* strEnd, int32_t num)
+        {
+            // first move forward by the number of digits
+            int32_t tempNum = num;
+            while (tempNum != 0)
+            {
+                tempNum /= 10;
+                str++;
+            }
+
+            // now write the digits to the string in reverse order
+            tempNum = num;
+            while (tempNum != 0)
+            {
+                *--str = '0' + (tempNum % 10);
+                tempNum /= 10;
+            }
+        }
+
+        static void AppendString(char*& str, char const* strEnd, const char* strToAppend)
+        {
+            while (*strToAppend != '\0' && str < strEnd)
+            {
+                *str++ = *strToAppend++;
+            }
+        }
+
+        // From https://en.wikipedia.org/wiki/CPUID
+        enum EFeature
+        {
+            FEATURE_PCLMULQDQ,
+            FEATURE_DTES64,
+            FEATURE_MONITOR,
+            FEATURE_DS_CPL,
+            FEATURE_VMX,
+            FEATURE_SMX,
+            FEATURE_EIST,
+            FEATURE_TM2,
+            FEATURE_CNXT_ID,
+            FEATURE_SDBG,
+            FEATURE_FMA,
+            FEATURE_CMPXCHG16B,
+            FEATURE_XTPR,
+            FEATURE_PDCM,
+            FEATURE_PCID,
+            FEATURE_DCA,
+            FEATURE_X2APIC,
+            FEATURE_MOVBE,
+            FEATURE_POPCNT,
+            FEATURE_TSC_DEADLINE,
+            FEATURE_AESNI,
+            FEATURE_XSAVE,
+            FEATURE_OSXSAVE,
+            FEATURE_F16C,
+            FEATURE_RDRAND,
+            FEATURE_FPU,
+            FEATURE_VME,
+            FEATURE_DE,
+            FEATURE_PSE,
+            FEATURE_TSC,
+            FEATURE_MSR,
+            FEATURE_PAE,
+            FEATURE_MCE,
+            FEATURE_CX8,
+            FEATURE_APIC,
+            FEATURE_SEP,
+            FEATURE_MTRR,
+            FEATURE_PGE,
+            FEATURE_MCA,
+            FEATURE_CMOV,
+            FEATURE_PAT,
+            FEATURE_PSE_36,
+            FEATURE_PSN,
+            FEATURE_CLFSH,
+            FEATURE_DS,
+            FEATURE_ACPI,
+            FEATURE_FXSR,
+            FEATURE_SS,
+            FEATURE_HTT,
+            FEATURE_TM,
+            FEATURE_PBE,
+            FEATURE_FSGSBASE,
+            FEATURE_SGX,
+            FEATURE_BMI1,
+            FEATURE_HLE,
+            FEATURE_BMI2,
+            FEATURE_RTM,
+            FEATURE_RDT_M,
+            FEATURE_MPX,
+            FEATURE_RDT_A,
+            FEATURE_RDSEED,
+            FEATURE_ADX,
+            FEATURE_SMAP,
+            FEATURE_IPT,
+            FEATURE_SHA,
+            FEATURE_DIGITALTEMP,
+            FEATURE_TURBOBOOST,
+            FEATURE_ARAT,
+            FEATURE_PLN,
+            FEATURE_ECMD,
+            FEATURE_PTM,
+            FEATURE_MMX,
+            FEATURE_SSE,
+            FEATURE_SSE2,
+            FEATURE_SSE3,
+            FEATURE_SSSE3,
+            FEATURE_SSE41,
+            FEATURE_SSE42,
+            FEATURE_AVX,
+            FEATURE_AVX2,
+            FEATURE_COUNT,
+        };
+
         struct cache_descr
         {
             u8          mId;
@@ -156,511 +270,215 @@ namespace ncore
             return NULL;
         }
 
-        struct cpu_id_t
-        {
-            s32  regs[4];
-            s32* data() { return &regs[0]; }
-            s32  operator[](int i) const { return regs[i]; }
-            s32& operator[](int i) { return regs[i]; }
-        };
-
         class cpu_info_t
         {
         public:
-            void init();
-
-            const char* getVendor() { return vendor; }
-            const char* getBrand();
-            int8_t      getStepping();
-            int8_t      getModel();
-            int8_t      getFamily();
-            const char* getProcessorType();
-            uint16_t    getExtendedModel();
-            uint32_t    getExtendedFamily();
-            void        getCacheTopology(char*& str, const char* strEnd);
-
-            bool SSE3(void)
-            {
-                __cpuid(registers.data(), 1);
-                return registers[2] & 0x1;
-            }
-            bool PCLMULQDQ(void)
-            {
-                __cpuid(registers.data(), 1);
-                return registers[2] & (0x1 << 1);
-            }
-            bool DTES64(void)
-            {
-                __cpuid(registers.data(), 1);
-                return registers[2] & (0x1 << 2);
-            }
-            bool MONITOR(void)
-            {
-                __cpuid(registers.data(), 1);
-                return registers[2] & (0x1 << 3);
-            }
-            bool DS_CPL(void)
-            {
-                __cpuid(registers.data(), 1);
-                return registers[2] & (0x1 << 4);
-            }
-            bool VMX(void)
-            {
-                __cpuid(registers.data(), 1);
-                return registers[2] & (0x1 << 5);
-            }
-            bool SMX(void)
-            {
-                __cpuid(registers.data(), 1);
-                return registers[2] & (0x1 << 6);
-            }
-            bool EIST(void)
-            {
-                __cpuid(registers.data(), 1);
-                return registers[2] & (0x1 << 7);
-            }
-            bool TM2(void)
-            {
-                __cpuid(registers.data(), 1);
-                return registers[2] & (0x1 << 8);
-            }
-            bool SSSE3(void)
-            {
-                __cpuid(registers.data(), 1);
-                return registers[2] & (0x1 << 9);
-            }
-            bool CNXT_ID(void)
-            {
-                __cpuid(registers.data(), 1);
-                return registers[2] & (0x1 << 10);
-            }
-            bool SDBG(void)
-            {
-                __cpuid(registers.data(), 1);
-                return registers[2] & (0x1 << 11);
-            }
-            bool FMA(void)
-            {
-                __cpuid(registers.data(), 1);
-                return registers[2] & (0x1 << 12);
-            }
-            bool CMPXCHG16B(void)
-            {
-                __cpuid(registers.data(), 1);
-                return registers[2] & (0x1 << 13);
-            }
-            bool xTPR(void)
-            {
-                __cpuid(registers.data(), 1);
-                return registers[2] & (0x1 << 14);
-            }
-            bool PDCM(void)
-            {
-                __cpuid(registers.data(), 1);
-                return registers[2] & (0x1 << 15);
-            }
-            bool PCID(void)
-            {
-                __cpuid(registers.data(), 1);
-                return registers[2] & (0x1 << 17);
-            }
-            bool DCA(void)
-            {
-                __cpuid(registers.data(), 1);
-                return registers[2] & (0x1 << 18);
-            }
-            bool SSE41(void)
-            {
-                __cpuid(registers.data(), 1);
-                return registers[2] & (0x1 << 19);
-            }
-            bool SSE42(void)
-            {
-                __cpuid(registers.data(), 1);
-                return registers[2] & (0x1 << 20);
-            }
-            bool x2APIC(void)
-            {
-                __cpuid(registers.data(), 1);
-                return registers[2] & (0x1 << 21);
-            }
-            bool MOVBE(void)
-            {
-                __cpuid(registers.data(), 1);
-                return registers[2] & (0x1 << 22);
-            }
-            bool POPCNT(void)
-            {
-                __cpuid(registers.data(), 1);
-                return registers[2] & (0x1 << 23);
-            }
-            bool TSC_Deadline(void)
-            {
-                __cpuid(registers.data(), 1);
-                return registers[2] & (0x1 << 24);
-            }
-            bool AESNI(void)
-            {
-                __cpuid(registers.data(), 1);
-                return registers[2] & (0x1 << 25);
-            }
-            bool XSAVE(void)
-            {
-                __cpuid(registers.data(), 1);
-                return registers[2] & (0x1 << 26);
-            }
-            bool OSXSAVE(void)
-            {
-                __cpuid(registers.data(), 1);
-                return registers[2] & (0x1 << 27);
-            }
-            bool AVX(void)
-            {
-                __cpuid(registers.data(), 1);
-                return registers[2] & (0x1 << 28);
-            }
-            bool F16C(void)
-            {
-                __cpuid(registers.data(), 1);
-                return registers[2] & (0x1 << 29);
-            }
-            bool RDRAND(void)
-            {
-                __cpuid(registers.data(), 1);
-                return registers[2] & (0x1 << 30);
-            }
-
-            /* ISA extensions listed in edx register */
-            bool FPU(void)
-            {
-                __cpuid(registers.data(), 1);
-                return registers[3] & 0x1;
-            }
-            bool VME(void)
-            {
-                __cpuid(registers.data(), 1);
-                return registers[3] & (0x1 << 1);
-            }
-            bool DE(void)
-            {
-                __cpuid(registers.data(), 1);
-                return registers[3] & (0x1 << 2);
-            }
-            bool PSE(void)
-            {
-                __cpuid(registers.data(), 1);
-                return registers[3] & (0x1 << 3);
-            }
-            bool TSC(void)
-            {
-                __cpuid(registers.data(), 1);
-                return registers[3] & (0x1 << 4);
-            }
-            bool MSR(void)
-            {
-                __cpuid(registers.data(), 1);
-                return registers[3] & (0x1 << 5);
-            }
-            bool PAE(void)
-            {
-                __cpuid(registers.data(), 1);
-                return registers[3] & (0x1 << 6);
-            }
-            bool MCE(void)
-            {
-                __cpuid(registers.data(), 1);
-                return registers[3] & (0x1 << 7);
-            }
-            bool CX8(void)
-            {
-                __cpuid(registers.data(), 1);
-                return registers[3] & (0x1 << 8);
-            }
-            bool APIC(void)
-            {
-                __cpuid(registers.data(), 1);
-                return registers[3] & (0x1 << 9);
-            }
-            bool SEP(void)
-            {
-                __cpuid(registers.data(), 1);
-                return registers[3] & (0x1 << 11);
-            }
-            bool MTRR(void)
-            {
-                __cpuid(registers.data(), 1);
-                return registers[3] & (0x1 << 12);
-            }
-            bool PGE(void)
-            {
-                __cpuid(registers.data(), 1);
-                return registers[3] & (0x1 << 13);
-            }
-            bool MCA(void)
-            {
-                __cpuid(registers.data(), 1);
-                return registers[3] & (0x1 << 14);
-            }
-            bool CMOV(void)
-            {
-                __cpuid(registers.data(), 1);
-                return registers[3] & (0x1 << 15);
-            }
-            bool PAT(void)
-            {
-                __cpuid(registers.data(), 1);
-                return registers[3] & (0x1 << 16);
-            }
-            bool PSE_36(void)
-            {
-                __cpuid(registers.data(), 1);
-                return registers[3] & (0x1 << 17);
-            }
-            bool PSN(void)
-            {
-                __cpuid(registers.data(), 1);
-                return registers[3] & (0x1 << 18);
-            }
-            bool CLFSH(void)
-            {
-                __cpuid(registers.data(), 1);
-                return registers[3] & (0x1 << 19);
-            }
-            bool DS(void)
-            {
-                __cpuid(registers.data(), 1);
-                return registers[3] & (0x1 << 21);
-            }
-            bool ACPI(void)
-            {
-                __cpuid(registers.data(), 1);
-                return registers[3] & (0x1 << 22);
-            }
-            bool MMX(void)
-            {
-                __cpuid(registers.data(), 1);
-                return registers[3] & (0x1 << 23);
-            }
-            bool FXSR(void)
-            {
-                __cpuid(registers.data(), 1);
-                return registers[3] & (0x1 << 24);
-            }
-            bool SSE(void)
-            {
-                __cpuid(registers.data(), 1);
-                return registers[3] & (0x1 << 25);
-            }
-            bool SSE2(void)
-            {
-                __cpuid(registers.data(), 1);
-                return registers[3] & (0x1 << 26);
-            }
-            bool SS(void)
-            {
-                __cpuid(registers.data(), 1);
-                return registers[3] & (0x1 << 27);
-            }
-            bool HTT(void)
-            {
-                __cpuid(registers.data(), 1);
-                return registers[3] & (0x1 << 28);
-            }
-            bool TM(void)
-            {
-                __cpuid(registers.data(), 1);
-                return registers[3] & (0x1 << 29);
-            }
-            bool PBE(void)
-            {
-                __cpuid(registers.data(), 1);
-                return registers[3] & (0x1 << 31);
-            }
-
-            /* Extended Features */
-            bool FSGSBASE(void)
-            {
-                __cpuidex(registers.data(), 7, 0);
-                return registers[1] & (0x1 << 0);
-            }
-            bool SGX(void)
-            {
-                __cpuidex(registers.data(), 7, 0);
-                return registers[1] & (0x1 << 2);
-            }
-            bool BMI1(void)
-            {
-                __cpuidex(registers.data(), 7, 0);
-                return registers[1] & (0x1 << 3);
-            }
-            bool HLE(void)
-            {
-                __cpuidex(registers.data(), 7, 0);
-                return registers[1] & (0x1 << 4);
-            }
-            bool AVX2(void)
-            {
-                __cpuidex(registers.data(), 7, 0);
-                return registers[1] & (0x1 << 5);
-            }
-            bool BMI2(void)
-            {
-                __cpuidex(registers.data(), 7, 0);
-                return registers[1] & (0x1 << 8);
-            }
-            bool RTM(void)
-            {
-                __cpuidex(registers.data(), 7, 0);
-                return registers[1] & (0x1 << 11);
-            }
-            bool RDT_M(void)
-            {
-                __cpuidex(registers.data(), 7, 0);
-                return registers[1] & (0x1 << 12);
-            }
-            bool MPX(void)
-            {
-                __cpuidex(registers.data(), 7, 0);
-                return registers[1] & (0x1 << 14);
-            }
-            bool RDT_A(void)
-            {
-                __cpuidex(registers.data(), 7, 0);
-                return registers[1] & (0x1 << 15);
-            }
-            bool RDSEED(void)
-            {
-                __cpuidex(registers.data(), 7, 0);
-                return registers[1] & (0x1 << 18);
-            }
-            bool ADX(void)
-            {
-                __cpuidex(registers.data(), 7, 0);
-                return registers[1] & (0x1 << 19);
-            }
-            bool SMAP(void)
-            {
-                __cpuidex(registers.data(), 7, 0);
-                return registers[1] & (0x1 << 20);
-            }
-            bool IPT(void)
-            {
-                __cpuidex(registers.data(), 7, 0);
-                return registers[1] & (0x1 << 25);
-            }
-            bool SHA(void)
-            {
-                __cpuidex(registers.data(), 7, 0);
-                return registers[1] & (0x1 << 29);
-            }
-
-            /* Thermal and Power Management */
-            bool DigitalTemp(void)
-            {
-                __cpuid(registers.data(), 6);
-                return registers[0] & (0x1 << 0);
-            }
-            bool TurboBoost(void)
-            {
-                __cpuid(registers.data(), 6);
-                return registers[0] & (0x1 << 1);
-            }
-            bool ARAT(void)
-            {
-                __cpuid(registers.data(), 6);
-                return registers[0] & (0x1 << 2);
-            }
-            bool PLN(void)
-            {
-                __cpuid(registers.data(), 6);
-                return registers[0] & (0x1 << 4);
-            }
-            bool ECMD(void)
-            {
-                __cpuid(registers.data(), 6);
-                return registers[0] & (0x1 << 5);
-            }
-            bool PTM(void)
-            {
-                __cpuid(registers.data(), 6);
-                return registers[0] & (0x1 << 6);
-            }
+            void     init(char*& str, char const* strEnd); // str -> vendor
+            void     getBrand(char*& str, char const* strEnd);
+            int8_t   getStepping();
+            int8_t   getModel();
+            int8_t   getFamily();
+            void     getProcessorType(char*& str, char const* strEnd);
+            uint16_t getExtendedModel();
+            uint32_t getExtendedFamily();
+            void     getCacheTopology(char*& str, const char* strEnd);
+            bool     hasFeature(EFeature feature) const;
 
         private:
             void CPUIDExtended();
 
-            cpu_id_t getCPUID(cpu_id_t& regs, int32_t eax, int32_t ecx);
-            void     getCacheInfo(char*& str, const char* strEnd);
-            int      MaxInputBasicCPUID;
-            int      MaxInputExtendedCPUID;
-            cpu_id_t registers; // will hold data from eax, ebx, ecx, edx
-            char     vendor[128];
-            char     brand[128];
+            void getCPUID(s32* regs, int32_t eax, int32_t ecx);
+            void getCacheInfo(char*& str, const char* strEnd);
+            int  MaxInputBasicCPUID;
+            int  MaxInputExtendedCPUID;
         };
+
+        struct feature_t
+        {
+            const char* name;
+            bool        extended;
+            int         function;
+            int         subleaf;
+            int         reg;
+            int         bit;
+        };
+
+        // convert all the cpu_info_t feature functions into a data array of features
+        static feature_t features[FEATURE_COUNT];
+        static void      init_features(feature_t* f)
+        {
+            f[FEATURE_PCLMULQDQ]    = {"PCLMULQDQ", false, 1, 0, 2, (0x1 << 1)};
+            f[FEATURE_DTES64]       = {"DTES64", false, 1, 0, 2, (0x1 << 2)};
+            f[FEATURE_MONITOR]      = {"MONITOR", false, 1, 0, 2, (0x1 << 3)};
+            f[FEATURE_DS_CPL]       = {"DS_CPL", false, 1, 0, 2, (0x1 << 4)};
+            f[FEATURE_VMX]          = {"VMX", false, 1, 0, 2, (0x1 << 5)};
+            f[FEATURE_SMX]          = {"SMX", false, 1, 0, 2, (0x1 << 6)};
+            f[FEATURE_EIST]         = {"EIST", false, 1, 0, 2, (0x1 << 7)};
+            f[FEATURE_TM2]          = {"TM2", false, 1, 0, 2, (0x1 << 8)};
+            f[FEATURE_CNXT_ID]      = {"CNXT_ID", false, 1, 0, 2, (0x1 << 10)};
+            f[FEATURE_SDBG]         = {"SDBG", false, 1, 0, 2, (0x1 << 11)};
+            f[FEATURE_FMA]          = {"FMA", false, 1, 0, 2, (0x1 << 12)};
+            f[FEATURE_CMPXCHG16B]   = {"CMPXCHG16B", false, 1, 0, 2, (0x1 << 13)};
+            f[FEATURE_XTPR]         = {"xTPR", false, 1, 0, 2, (0x1 << 14)};
+            f[FEATURE_PDCM]         = {"PDCM", false, 1, 0, 2, (0x1 << 15)};
+            f[FEATURE_PCID]         = {"PCID", false, 1, 0, 2, (0x1 << 17)};
+            f[FEATURE_DCA]          = {"DCA", false, 1, 0, 2, (0x1 << 18)};
+            f[FEATURE_X2APIC]       = {"x2APIC", false, 1, 0, 2, (0x1 << 21)};
+            f[FEATURE_MOVBE]        = {"MOVBE", false, 1, 0, 2, (0x1 << 22)};
+            f[FEATURE_POPCNT]       = {"POPCNT", false, 1, 0, 2, (0x1 << 23)};
+            f[FEATURE_TSC_DEADLINE] = {"TSC_Deadline", false, 1, 0, 2, (0x1 << 24)};
+            f[FEATURE_AESNI]        = {"AESNI", false, 1, 0, 2, (0x1 << 25)};
+            f[FEATURE_XSAVE]        = {"XSAVE", false, 1, 0, 2, (0x1 << 26)};
+            f[FEATURE_OSXSAVE]      = {"OSXSAVE", false, 1, 0, 2, (0x1 << 27)};
+            f[FEATURE_F16C]         = {"F16C", false, 1, 0, 2, (0x1 << 29)};
+            f[FEATURE_RDRAND]       = {"RDRAND", false, 1, 0, 2, (0x1 << 30)};
+            /* ISA extensions listed in edx register */
+            f[FEATURE_FPU]    = {"FPU", false, 1, 0, 3, 0x1};
+            f[FEATURE_VME]    = {"VME", false, 1, 0, 3, (0x1 << 1)};
+            f[FEATURE_DE]     = {"DE", false, 1, 0, 3, (0x1 << 2)};
+            f[FEATURE_PSE]    = {"PSE", false, 1, 0, 3, (0x1 << 3)};
+            f[FEATURE_TSC]    = {"TSC", false, 1, 0, 3, (0x1 << 4)};
+            f[FEATURE_MSR]    = {"MSR", false, 1, 0, 3, (0x1 << 5)};
+            f[FEATURE_PAE]    = {"PAE", false, 1, 0, 3, (0x1 << 6)};
+            f[FEATURE_MCE]    = {"MCE", false, 1, 0, 3, (0x1 << 7)};
+            f[FEATURE_CX8]    = {"CX8", false, 1, 0, 3, (0x1 << 8)};
+            f[FEATURE_APIC]   = {"APIC", false, 1, 0, 3, (0x1 << 9)};
+            f[FEATURE_SEP]    = {"SEP", false, 1, 0, 3, (0x1 << 11)};
+            f[FEATURE_MTRR]   = {"MTRR", false, 1, 0, 3, (0x1 << 12)};
+            f[FEATURE_PGE]    = {"PGE", false, 1, 0, 3, (0x1 << 13)};
+            f[FEATURE_MCA]    = {"MCA", false, 1, 0, 3, (0x1 << 14)};
+            f[FEATURE_CMOV]   = {"CMOV", false, 1, 0, 3, (0x1 << 15)};
+            f[FEATURE_PAT]    = {"PAT", false, 1, 0, 3, (0x1 << 16)};
+            f[FEATURE_PSE_36] = {"PSE_36", false, 1, 0, 3, (0x1 << 17)};
+            f[FEATURE_PSN]    = {"PSN", false, 1, 0, 3, (0x1 << 18)};
+            f[FEATURE_CLFSH]  = {"CLFSH", false, 1, 0, 3, (0x1 << 19)};
+            f[FEATURE_DS]     = {"DS", false, 1, 0, 3, (0x1 << 21)};
+            f[FEATURE_ACPI]   = {"ACPI", false, 1, 0, 3, (0x1 << 22)};
+            f[FEATURE_FXSR]   = {"FXSR", false, 1, 0, 3, (0x1 << 24)};
+            f[FEATURE_SS]     = {"SS", false, 1, 0, 3, (0x1 << 27)};
+            f[FEATURE_HTT]    = {"HTT", false, 1, 0, 3, (0x1 << 28)};
+            f[FEATURE_TM]     = {"TM", false, 1, 0, 3, (0x1 << 29)};
+            f[FEATURE_PBE]    = {"PBE", false, 1, 0, 3, (0x1 << 31)},
+            /* Extended Features */
+                f[FEATURE_FSGSBASE] = {"FSGSBASE", true, 7, 0, 1, (0x1 << 0)};
+            f[FEATURE_SGX]          = {"SGX", true, 7, 0, 1, (0x1 << 2)};
+            f[FEATURE_BMI1]         = {"BMI1", true, 7, 0, 1, (0x1 << 3)};
+            f[FEATURE_HLE]          = {"HLE", true, 7, 0, 1, (0x1 << 4)};
+            f[FEATURE_BMI2]         = {"BMI2", true, 7, 0, 1, (0x1 << 8)};
+            f[FEATURE_RTM]          = {"RTM", true, 7, 0, 1, (0x1 << 11)};
+            f[FEATURE_RDT_M]        = {"RDT_M", true, 7, 0, 1, (0x1 << 12)};
+            f[FEATURE_MPX]          = {"MPX", true, 7, 0, 1, (0x1 << 14)};
+            f[FEATURE_RDT_A]        = {"RDT_A", true, 7, 0, 1, (0x1 << 15)};
+            f[FEATURE_RDSEED]       = {"RDSEED", true, 7, 0, 1, (0x1 << 18)};
+            f[FEATURE_ADX]          = {"ADX", true, 7, 0, 1, (0x1 << 19)};
+            f[FEATURE_SMAP]         = {"SMAP", true, 7, 0, 1, (0x1 << 20)};
+            f[FEATURE_IPT]          = {"IPT", true, 7, 0, 1, (0x1 << 25)};
+            f[FEATURE_SHA]          = {"SHA", true, 7, 0, 1, (0x1 << 29)};
+
+            /* Thermal and Power Management */
+            f[FEATURE_DIGITALTEMP] = {"DigitalTemp", false, 6, 0, 0, (0x1 << 0)};
+            f[FEATURE_TURBOBOOST]  = {"TurboBoost", false, 6, 0, 0, (0x1 << 1)};
+            f[FEATURE_ARAT]        = {"ARAT", false, 6, 0, 0, (0x1 << 2)};
+            f[FEATURE_PLN]         = {"PLN", false, 6, 0, 0, (0x1 << 4)};
+            f[FEATURE_ECMD]        = {"ECMD", false, 6, 0, 0, (0x1 << 5)};
+            f[FEATURE_PTM]         = {"PTM", false, 6, 0, 0, (0x1 << 6)};
+
+            f[FEATURE_MMX]   = {"MMX", false, 1, 0, 3, (0x1 << 23)};
+            f[FEATURE_SSE]   = {"SSE", false, 1, 0, 3, (0x1 << 25)};
+            f[FEATURE_SSE2]  = {"SSE2", false, 1, 0, 3, (0x1 << 26)};
+            f[FEATURE_SSE3]  = {"SSE3", false, 1, 0, 2, (0x1 << 0)};
+            f[FEATURE_SSSE3] = {"SSSE3", false, 1, 0, 2, (0x1 << 9)};
+            f[FEATURE_SSE41] = {"SSE41", false, 1, 0, 2, (0x1 << 19)};
+            f[FEATURE_SSE42] = {"SSE42", false, 1, 0, 2, (0x1 << 20)};
+
+            f[FEATURE_AVX]  = {"AVX", false, 1, 0, 2, (0x1 << 28)};
+            f[FEATURE_AVX2] = {"AVX2", true, 7, 0, 1, (0x1 << 5)};
+        }
+
+        bool cpu_info_t::hasFeature(EFeature feature) const
+        {
+            const feature_t f = features[feature];
+            s32             regs[4];
+            if (f.extended)
+            {
+                __cpuidex(regs, f.function, f.subleaf);
+                return regs[f.reg] & f.bit;
+            }
+            else
+            {
+                __cpuid(regs, f.function);
+                return regs[f.reg] & f.bit;
+            }
+        }
 
 #    define CHECK_BIT(var, pos) ((var) & (1<<(pos))
 #    define MASK_LOWBYTE(var) ((var)&0xff)
 
-        void cpu_info_t::init()
+        void cpu_info_t::init(char*& str, char const* strEnd)
         {
-            int32_t* startOfArray = registers.data(); // get the starting address of the array
-            __cpuid(startOfArray, 0);
-            MaxInputBasicCPUID = registers[0]; // number of standard CPUID leafs
+            init_features(features);
 
-            int count = 0;
+            s32 regs[4];
+            __cpuid(regs, 0);
+            MaxInputBasicCPUID = regs[0]; // number of standard CPUID leafs
 
             // per Intel documentation vendor name stored in ebx, edx, ecx -- need to switch order in array
-            int32_t temp = registers[3]; // edx
-            registers[3] = registers[2];
-            registers[2] = temp;
+            int32_t temp = regs[3]; // edx
+            regs[3]      = regs[2];
+            regs[2]      = temp;
 
+            char vendor[128];
+            int  count = 0;
             for (int i = 1; i < 4; i++)
             {
                 for (int j = 0; j < 4; j++)
                 {
-                    vendor[count] = (char)registers[i]; // get the lowest order byte
-                    registers[i]  = registers[i] >> 8;
-                    count++;
+                    vendor[count++] = (char)regs[i]; // get the lowest order byte
+                    regs[i]         = regs[i] >> 8;
                 }
             }
             vendor[count] = '\0';
 
+            AppendString(str, strEnd, vendor);
+            AppendString(str, strEnd, " ");
+
             CPUIDExtended();
-            startOfArray = nullptr; // clean dangling pointer
         }
 
         void cpu_info_t::CPUIDExtended()
         {
-            cpu_id_t extendedRegisters;
-            int32_t* startOfArray = extendedRegisters.data();
+            s32 regs[4];
 
             int32_t extended = 0x80000000;
-            __cpuid(startOfArray, extended);
-            MaxInputExtendedCPUID = extendedRegisters[0];
+            __cpuid(regs, extended);
+            MaxInputExtendedCPUID = regs[0];
 
             for (int k = extended + 1; k < MaxInputExtendedCPUID; k++)
             {
-                __cpuid(startOfArray, k);
+                __cpuid(regs, k);
             }
         }
 
         int8_t cpu_info_t::getStepping()
         {
-            __cpuid(registers.data(), 0x1);
-            return registers[0] & 0xf;
+            s32 regs[4];
+            __cpuid(regs, 0x1);
+            return regs[0] & 0xf;
         }
 
         int8_t cpu_info_t::getModel()
         {
-            __cpuid(registers.data(), 0x1);
-            int8_t mod = (registers[0] & 0xf0) >> 4;
+            s32 regs[4];
+            __cpuid(regs, 0x1);
+            int8_t mod = (regs[0] & 0xf0) >> 4;
             return mod;
         }
 
         int8_t cpu_info_t::getFamily()
         {
-            __cpuid(registers.data(), 0x1);
-            return (registers[0] & 0xf00) >> 8;
+            s32 regs[4];
+            __cpuid(regs, 0x1);
+            return (regs[0] & 0xf00) >> 8;
         }
 
         uint16_t cpu_info_t::getExtendedModel()
@@ -668,8 +486,9 @@ namespace ncore
             int8_t family = getFamily();
             if (family == 0x6 || family == 0xf)
             {
-                __cpuid(registers.data(), 0x1);
-                uint32_t extMod       = (registers[0] & 0xf0000) >> 12;
+                s32 regs[4];
+                __cpuid(regs, 0x1);
+                uint32_t extMod       = (regs[0] & 0xf0000) >> 12;
                 uint16_t displayModel = extMod + getModel();
                 while ((displayModel & 0x1) == 0)
                     displayModel >>= 1;
@@ -679,11 +498,7 @@ namespace ncore
                 return getModel();
         }
 
-        cpu_id_t cpu_info_t::getCPUID(cpu_id_t& regs, int32_t eax, int32_t ecx)
-        {
-            __cpuidex(regs.data(), eax, ecx);
-            return regs;
-        }
+        void cpu_info_t::getCPUID(s32* regs, int32_t eax, int32_t ecx) { __cpuidex(regs, eax, ecx); }
 
         uint32_t cpu_info_t::getExtendedFamily()
         {
@@ -691,52 +506,55 @@ namespace ncore
                 return getFamily();
             else
             {
-                (getCPUID(registers, 0x1, 0x0));
-                uint32_t displayModel = registers[0] & 0xff00000 + getFamily();
+                s32 regs[4];
+                getCPUID(regs, 0x1, 0x0);
+                uint32_t displayModel = regs[0] & 0xff00000 + getFamily();
                 while ((displayModel & 0x1) == 0)
                     displayModel >>= 1;
                 return displayModel;
             }
         }
 
-        const char* cpu_info_t::getProcessorType()
+        void cpu_info_t::getProcessorType(char*& str, char const* strEnd)
         {
-            getCPUID(registers, 0x1, 0x0);
-            int8_t type = (registers[0] & 0x3000) >> 0xC;
+            s32 regs[4];
+            getCPUID(regs, 0x1, 0x0);
+            int8_t type = (regs[0] & 0x3000) >> 0xC;
             if (type == 0b00)
-                return "Original OEM Processor";
+                AppendString(str, strEnd, "Original OEM Processor ");
             else if (type == 0b01)
-                return "Intel OverDrive Processor";
+                AppendString(str, strEnd, "Intel OverDrive Processor ");
             else if (type == 0b10)
-                return "Dual Processor";
-            return "Intel Reserved";
+                AppendString(str, strEnd, "Dual Processor ");
+            else
+                AppendString(str, strEnd, "Intel Reserved ");
         }
 
-        const char* cpu_info_t::getBrand()
+        void cpu_info_t::getBrand(char*& str, char const* strEnd)
         {
-            __cpuid(registers.data(), 0x80000000);
-            if (registers[0] < 0x80000004)
-                return NULL;
+            s32 regs[4];
+            __cpuid(regs, 0x80000000);
+            if (regs[0] < 0x80000004)
+                return;
 
-            const int CPUID_Leaves    = 3;
-            const int registersNeeded = 4;
-            int       encodedBrand[CPUID_Leaves][registersNeeded];
+            const int CPUID_Leaves = 3;
+            const int regsNeeded   = 4;
+            int       encodedBrand[CPUID_Leaves][regsNeeded];
 
             for (int i = 0; i <= 2; i++)
             {
-                __cpuid(registers.data(), i + 0x80000002);
+                __cpuid(regs, i + 0x80000002);
 
-                for (int j = 0; j < registersNeeded; j++)
-                    encodedBrand[i][j] = registers[j];
+                for (int j = 0; j < regsNeeded; j++)
+                    encodedBrand[i][j] = regs[j];
             }
 
-            char* str = brand;
-			const char* strEnd = str + sizeof(brand) - 1;
-
             // outside loop for 3 exteneded CPUID leaves
+            char brand[128];
+            int  count = 0;
             for (int ii = 0; ii < 3; ii++)
             {
-                // loop for the 4 registers at each leaf
+                // loop for the 4 regs at each leaf
                 for (int jj = 0; jj < 4; jj++)
                 {
                     // inner loop for 4 bytes in each register
@@ -744,24 +562,21 @@ namespace ncore
                     {
                         if (encodedBrand[ii][jj] == 0x20202020)
                             continue; // skip over excessive empty space
-							
-                        *str++ = MASK_LOWBYTE(encodedBrand[ii][jj]);
-						if (str == strEnd)
-						{
-							kk = jj = ii = 4;
-							break;
-						}
+
+                        brand[count++] = MASK_LOWBYTE(encodedBrand[ii][jj]);
                         encodedBrand[ii][jj] >>= 8;
                     }
                 }
             }
-			*str++ = '\0';
-			return brand;
+            brand[count] = '\0';
+            AppendString(str, strEnd, brand);
+            AppendString(str, strEnd, " ");
         }
 
         void cpu_info_t::getCacheTopology(char*& str, char const* strEnd)
         {
-            __cpuid(registers.data(), 2);
+            s32 regs[4];
+            __cpuid(regs, 2);
             uint32_t validCacheData = 0x80000000; // bit 31 of the register will be 0 iff there is a valid 1 byte cache descriptor
 
             uint8_t highestByte   = 0;
@@ -771,16 +586,16 @@ namespace ncore
 
             for (int i = 0; i < 4; i++)
             {
-                if (!CHECK_BIT(registers[i], 31)))
+                if (!CHECK_BIT(regs[i], 31)))
                     {
                         if (i != 0)
-                            bottomByte = MASK_LOWBYTE(registers[i]);
-                        registers[i] >>= 8;
-                        botMiddleByte = MASK_LOWBYTE(registers[i]);
-                        registers[i] >>= 8;
-                        topMiddleByte = MASK_LOWBYTE(registers[i]);
-                        registers[i] >>= 8;
-                        highestByte = MASK_LOWBYTE(registers[i]);
+                            bottomByte = MASK_LOWBYTE(regs[i]);
+                        regs[i] >>= 8;
+                        botMiddleByte = MASK_LOWBYTE(regs[i]);
+                        regs[i] >>= 8;
+                        topMiddleByte = MASK_LOWBYTE(regs[i]);
+                        regs[i] >>= 8;
+                        highestByte = MASK_LOWBYTE(regs[i]);
                     }
 
                 uint8_t cacheCodes[] = {highestByte, topMiddleByte, botMiddleByte, bottomByte};
@@ -793,49 +608,18 @@ namespace ncore
                     else if (cacheCodes[j] != 0 && CacheLookup_Find(cacheCodes[j]) != NULL)
                     {
                         const char* cacheDescriptor = CacheLookup_Find(cacheCodes[j])->mDescr;
-                        while (*cacheDescriptor != '\0' && str < strEnd)
-                        {
-                            *str++ += *cacheDescriptor++;
-                        }
-                        *str++ = '\n';
+                        AppendString(str, strEnd, cacheDescriptor);
+                        AppendString(str, strEnd, "\n");
                     }
                 }
             }
         }
 
-        static void IntToString(char*& str, char const* strEnd, int32_t num)
-        {
-            // first count the number of digits
-            int32_t numDigits = 0;
-            int32_t tempNum   = num;
-            while (tempNum != 0)
-            {
-                tempNum /= 10;
-                numDigits++;
-            }
-
-            // now write the digits to the string in reverse order
-            str += numDigits;
-            for (int i = 0; i < numDigits; i++)
-            {
-                *--str = '0' + (num % 10);
-                num /= 10;
-            }
-            str -= numDigits;
-        }
-
-        static void AppendString(char*& str, char const* strEnd, const char* strToAppend)
-        {
-            while (*strToAppend != '\0' && str < strEnd)
-            {
-                *str++ = *strToAppend++;
-            }
-        }
-
         void cpu_info_t::getCacheInfo(char*& str, const char* strEnd)
         {
-            registers[0] = 0xffffffff;
-            int count    = 0;
+            s32 regs[4];
+            regs[0]   = 0xffffffff;
+            int count = 0;
 
             struct Cache /* Struct organized largest element to smallest element to minimize alignment padding */
             {
@@ -853,29 +637,29 @@ namespace ncore
                 bool     Mapping;
             };
 
-            while (registers[0] != 0x0)
+            while (regs[0] != 0x0)
             {
-                __cpuidex(registers.data(), 0x4, count);
+                __cpuidex(regs, 0x4, count);
                 Cache cache;
-                cache.type = registers[0] & 0x1F;
+                cache.type = regs[0] & 0x1F;
                 if (cache.type == 0)
                     break; // no more cache levels
-                cache.level             = ((registers[0] & 0xE0) >> 5);
-                cache.selfInit          = registers[0] & 0x100;
-                cache.FullyAssoc        = registers[0] & 0x200;
-                cache.lineSize          = (registers[1] & 0xFFF) + 1;
-                cache.linePartitions    = ((registers[1] & 0x3FF000) >> 12) + 1;
-                cache.lineAssociativity = ((registers[1] & 0xFFC00000) >> 22) + 1;
-                cache.numSets           = (registers[2] & 0xFFFFFFFF) + 1;
-                cache.WriteBack         = registers[3] & 0x1;
-                cache.Inclusive         = registers[3] & 0x2;
-                cache.Mapping           = registers[3] & 0x4;
+                cache.level             = ((regs[0] & 0xE0) >> 5);
+                cache.selfInit          = regs[0] & 0x100;
+                cache.FullyAssoc        = regs[0] & 0x200;
+                cache.lineSize          = (regs[1] & 0xFFF) + 1;
+                cache.linePartitions    = ((regs[1] & 0x3FF000) >> 12) + 1;
+                cache.lineAssociativity = ((regs[1] & 0xFFC00000) >> 22) + 1;
+                cache.numSets           = (regs[2] & 0xFFFFFFFF) + 1;
+                cache.WriteBack         = regs[3] & 0x1;
+                cache.Inclusive         = regs[3] & 0x2;
+                cache.Mapping           = regs[3] & 0x4;
 
                 cache.CacheSize  = cache.lineAssociativity * cache.lineSize * cache.linePartitions * cache.numSets;
-                int16_t numCores = ((registers[1] & 0xFFC00000) >> 22) + 1; // includes hyperthreaded cores
+                int16_t numCores = ((regs[1] & 0xFFC00000) >> 22) + 1; // includes hyperthreaded cores
                 while (numCores % 2 != 0)
                     numCores++; // round-up to nearest power of 2 --> likely ok solution if cores disabled in BIOS
-                if (HTT())
+                if (hasFeature(FEATURE_HTT))
                     numCores >>= 1; // if hyperthreading, number of physical cores is half -- possible issue on AMD
 
                 int8_t cachepostfixCount = 0;
@@ -921,6 +705,20 @@ namespace ncore
         // s32  cpu_info_t::getLogicalProcessorsPerPhysical() { return 1; }
 
     } // namespace ncpu
+
+    void GetCpuInfo()
+    {
+        char cpuInfo[1024];
+        cpuInfo[0]                   = '\0';
+        cpuInfo[sizeof(cpuInfo) - 1] = '\0';
+        char* str                    = cpuInfo;
+
+        ncpu::cpu_info_t info;
+        info.init(str, cpuInfo + 1024 - 1);
+        info.getBrand(str, cpuInfo + 1024 - 1);
+        info.getProcessorType(str, cpuInfo + 1024 - 1);
+        info.getCacheTopology(str, cpuInfo + 1024 - 1);
+    }
     //---------------------------------------------------------------------------------------------------------------------
 
 } // namespace ncore

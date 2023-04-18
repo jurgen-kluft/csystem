@@ -9,6 +9,12 @@ namespace ncore
 {
     class alloc_t;
 
+    class cpu_info_t
+    {
+    public:
+
+    };
+
     class system_t
     {
     public:
@@ -116,7 +122,7 @@ namespace ncore
 
         bool isCircleButtonBack() const;
 
-        void        setAppTitle(const char* title) const;
+        void        setAppTitle(const char* title);
         const char* getAppTitle() const;
         const char* getExePath() const;
 
