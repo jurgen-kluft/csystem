@@ -1,5 +1,4 @@
-#include "cbase/c_base.h"
-#include "cbase/c_allocator.h"
+#include "ccore/c_allocator.h"
 
 #if defined(TARGET_MAC)
 
@@ -55,7 +54,7 @@ namespace ncore
         if (sysctlbyname("hw.logicalcpu", &logical, &logical_size, nullptr, 0) != 0)
             logical = -1;
 
-        int    physical      = 0;
+        physical      = 0;
         size_t physical_size = sizeof(physical);
         if (sysctlbyname("hw.physicalcpu", &physical, &physical_size, nullptr, 0) != 0)
             physical = -1;

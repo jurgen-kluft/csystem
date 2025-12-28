@@ -1,6 +1,6 @@
 #include "ccore/c_target.h"
+#include "ccore/c_allocator.h"
 #include "csystem/c_system.h"
-#include "csystem/test_allocator.h"
 
 #include "cunittest/cunittest.h"
 
@@ -9,6 +9,7 @@ UNITTEST_SUITE_BEGIN(basic_info)
 	UNITTEST_FIXTURE(console)
 	{
         UNITTEST_ALLOCATOR;
+
 		ncore::system_t system;
 		UNITTEST_FIXTURE_SETUP() { system.init(Allocator); }
 		UNITTEST_FIXTURE_TEARDOWN() { system.shutdown(); }
@@ -19,7 +20,7 @@ UNITTEST_SUITE_BEGIN(basic_info)
 #ifdef TARGET_PC
 			CHECK_TRUE(consoleType == ncore::system_t::EConsoleType::CONSOLE_DESKTOP);
 #endif
-			
+
 		}
 	}
 
