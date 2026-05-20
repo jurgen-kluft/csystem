@@ -1,5 +1,5 @@
-#ifndef __CSYSTEM_H__
-#define __CSYSTEM_H__
+#ifndef __CSYSTEM_SYSTEM_H__
+#define __CSYSTEM_SYSTEM_H__
 #include "ccore/c_target.h"
 #ifdef USE_PRAGMA_ONCE
 #    pragma once
@@ -8,21 +8,9 @@
 namespace ncore
 {
     class alloc_t;
-
-    class cpu_info_t
+    
+    namespace nsystem
     {
-    public:
-
-    };
-
-    class system_t
-    {
-    public:
-        struct instance_t;
-
-        static void      setSystem(system_t* instance);
-        static system_t* getSystem();
-
         enum ELanguage
         {
             LANGUAGE_INVALID    = -1,
@@ -93,59 +81,56 @@ namespace ncore
             ENVIRONMENT_RETAIL      = 4,
         };
 
-        void init(alloc_t*);
-        void update();
-        void shutdown();
+        static void init(alloc_t*);
+        static void update();
+        static void shutdown();
 
-        bool isLittleEndian() const;
-        bool isBigEndian() const;
-        bool is64BitOS() const;
+        static bool isLittleEndian();
+        static bool isBigEndian();
+        static bool is64BitOS();
 
-        EConsoleType getConsoleType() const;
-        EMediaType   getMediaType() const;
-        EDataSource  getDataSource() const;
-        EEnvMode     getEnvMode() const;
+        static EConsoleType getConsoleType();
+        static EMediaType   getMediaType();
+        static EDataSource  getDataSource();
+        static EEnvMode     getEnvMode();
 
-        ELanguage   getLanguage() const;
-        const char* getLanguageString(ELanguage) const;
-        void        setLanguage(ELanguage language);
+        static ELanguage   getLanguage();
+        static const char* getLanguageString(ELanguage);
+        static void        setLanguage(ELanguage language);
 
-        u64 getTotalMemorySize() const;
-        u64 getCurrentSystemMemory() const;
+        static u64 getTotalMemorySize();
+        static u64 getCurrentSystemMemory();
 
-        const char* getUnixEndLine();
-        const char* getWindowsEndLine();
-        const char* getEndLine();
+        static const char* getUnixEndLine();
+        static const char* getWindowsEndLine();
+        static const char* getEndLine();
 
-        void setUserName(const char* szUserName);
-        void getUserName(char* szBuffer, u32 szBufferMaxLen) const;
+        static void setUserName(const char* szUserName);
+        static void getUserName(char* szBuffer, u32 szBufferMaxLen);
 
-        bool isCircleButtonBack() const;
+        static bool isCircleButtonBack();
 
-        void        setAppTitle(const char* title);
-        const char* getAppTitle() const;
-        const char* getExePath() const;
+        static void        setAppTitle(const char* title);
+        static const char* getAppTitle();
+        static const char* getExePath();
 
-        bool hasVirtualMemory() const;
+        static s32 getNumCores();
+        static s32 getNumHwThreadsPerCore();
+        static u64 getCoreClockFrequency();
 
-        s32 getNumCores() const;
-        s32 getNumHwThreadsPerCore() const;
-        u64 getCoreClockFrequency() const;
+        static const char* getPlatformName();    // Name of platform
+        static const char* getBuildConfigName(); // Debug, Release, Final
+        static const char* getBuildModeName();   // Dev, Client, Retail
+        static const char* getConsoleTypeName(); //
+        static const char* getMediaTypeName();   //
+        static const char* getLanguageName();
 
-        const char* getPlatformName() const;    // Name of platform
-        const char* getBuildConfigName() const; // Debug, Release, Final
-        const char* getBuildModeName() const;   // Dev, Client, Retail
-        const char* getConsoleTypeName() const; //
-        const char* getMediaTypeName() const;   //
-        const char* getLanguageName() const;
+        static u64 getCodeSegmentSize();
+        static u64 getBssSegmentSize();
+        static u64 getDataSegmentSize();
+        static u64 getMainThreadStackSize();
+    }
 
-        u64 getCodeSegmentSize() const;
-        u64 getBssSegmentSize() const;
-        u64 getDataSegmentSize() const;
-        u64 getMainThreadStackSize() const;
+} // namespace ncore
 
-        instance_t* m_instance;
-    };
-}; // namespace ncore
-
-#endif // __CSYSTEM_H__
+#endif // __CSYSTEM_SYSTEM_H__
